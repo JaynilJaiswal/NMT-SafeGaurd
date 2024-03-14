@@ -1,44 +1,41 @@
-from transformers import MarianTokenizer
-from torch.utils.data import Dataset
-from torch.nn.utils.rnn import pad_sequence
 import torch
+from torch.utils.data import Dataset, DataLoader
+from transformers import BertTokenizer
 
-
+# Define BaseInstance class
 class BaseInstance(object):
-    def __init__(self, embed_data, text):
-        self.embedding = embed_data['input_ids']
-        self.input_mask = embed_data['attention_mask']
-        self.text = text
+    def __init__(self, embedding, text, attention_mask):
+        self.embedding = embedding  # Input embeddings
+        self.text = text  # Original text
+        self.attention_mask = attention_mask  # Attention mask
 
-
-class CustomDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
-        self.tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-de")
+# Custom Dataset class
+class WMT14Dataset(Dataset):
+    def __init__(self, dataset, tokenizer):
+        self.data = dataset
+        self.tokenizer = tokenizer
 
     def __len__(self):
-        return len(self.data['en'])  # Assuming equal number of sentences for both languages
+        return len(self.data)
 
     def __getitem__(self, idx):
-        en_instance = self.data['en'][idx]
-        de_instance = self.data['de'][idx]
+        sentence = self.data['train'][idx]
+        input_ids = self.tokenizer.encode(sentence['translation']['en'], return_tensors="pt", padding=True, truncation=True)
+        attention_mask = input_ids!= self.tokenizer.pad_token_id
+        return BaseInstance(embedding=input_ids, text=sentence, attention_mask=attention_mask)
 
-        input_ids_en = en_instance.embedding
-        input_ids_de = de_instance.embedding
-        attention_mask_en = en_instance.input_mask
-        attention_mask_de = de_instance.input_mask
+    def collate_fn(self, batch):
+        # Separate input_ids and attention_masks
+        input_ids = [item.embedding for item in batch]
+        # attention_masks = [torch.ones_like(input_id) for input_id in input_ids]  # Assuming all tokens are valid
+        attention_masks = [item.attention_mask for item in batch]
+        # Pad sequences to the maximum length in the batch
+        max_len = max(input_id.size()[1] for input_id in input_ids)
+        input_ids = torch.stack([torch.nn.functional.pad(input_id, (0, max_len - input_id.size()[1])) for input_id in input_ids])
+        attention_masks = torch.stack([torch.nn.functional.pad(mask, (0, max_len - mask.size()[1])) for mask in attention_masks])
 
-        return input_ids_en, input_ids_de, attention_mask_en, attention_mask_de
-    
-    def collate_func(self, batch):
-        # print(len(list(zip(*batch))))
-        input_ids_en, input_ids_de, attention_mask_en, attention_mask_de = zip(*batch)
-    
-        # Pad sequences within batch to the same length
-        input_ids_en_padded = pad_sequence([t.squeeze() for t in input_ids_en], batch_first=True, padding_value=0)
-        input_ids_de_padded = pad_sequence([t.squeeze() for t in input_ids_de], batch_first=True, padding_value=0)
-        attention_mask_en_padded = pad_sequence([t.squeeze() for t in attention_mask_en], batch_first=True, padding_value=0)
-        attention_mask_de_padded = pad_sequence([t.squeeze() for t in attention_mask_de], batch_first=True, padding_value=0)
+        return input_ids, attention_masks
         
-        return input_ids_en_padded, input_ids_de_padded, attention_mask_en_padded, attention_mask_de_padded
-
+    def load_data(self, data_file):
+        # Implement loading and preprocessing of data from the file
+        pass

@@ -1,59 +1,61 @@
 import torch
-from model import CustomMTModel
-from utils import *
-from torch.utils.data import DataLoader
-import pickle
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+from transformers import BertTokenizer
+from model import Autoencoder
+from utils import WMT14Dataset
+from datasets import load_dataset
+
+
 
 
 # Load data from pickle file
-with open('all_inputs_250', 'rb') as f:
-    data = pickle.load(f)
+# with open('all_inputs_250', 'rb') as f:
+#     data = pickle.load(f)
+# Load WMT14 dataset from Hugging Face
+dataset = load_dataset("wmt14", "de-en")
 
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Initialize custom dataset and dataloader
-custom_dataset = CustomDataset(data)
-dataloader = DataLoader(custom_dataset, batch_size=32, shuffle=True, collate_fn=custom_dataset.collate_func)
-
-# Initialize model
-model = CustomMTModel(device)
-model.to(device)
-
-# Define optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
-
-def compute_loss(outputs, targets):
-    logits = outputs.logits  # Shape: (batch_size, sequence_length, vocab_size)
-    # Assuming targets are labels for language modeling (next word prediction)
-    loss = torch.nn.CrossEntropyLoss()  # Cross-entropy loss for language modeling
-    return loss(logits.view(-1, logits.size(-1)), targets.view(-1))
-
-# Training loop
-num_epochs = 5
-for epoch in range(num_epochs):
+# Define training function
+def train(model, dataloader, optimizer, criterion, device):
+    model.train()
+    total_loss = 0.0
     for batch in dataloader:
-        # Unpack batch
-        # for x in batch:
-        #     print(x.size())
-        inputs_en, inputs_de, mask_en, mask_de = batch     
-
-        
-        # print(next(model.parameters()).device)
-        # print(device)
-        # Forward pass
-        outputs = model(inputs_en.to(device), mask_en.to(device), inputs_de.to(device), mask_de.to(device))
-
-        # Compute loss
-        loss = compute_loss(outputs, inputs_de.to(device))
-
-        # Backpropagation
+        print(batch[1].size())
+        input_ids = batch[0].squeeze().to(device)
+        # attention_mask = input_ids != tokenizer.pad_token_id
+        attention_mask = batch[1].squeeze().to(device)
         optimizer.zero_grad()
+        reconstructed_logits = model(input_ids, attention_mask)
+        print(reconstructed_logits.size(), input_ids.size())
+        loss = criterion(reconstructed_logits.view(-1, reconstructed_logits.size(-1)), input_ids)
         loss.backward()
         optimizer.step()
+        total_loss += loss.item()
+    return total_loss / len(dataloader)
 
-        # Print progress
-        if batch % 10 == 9:
-            print(f"Epoch [{epoch + 1}/{num_epochs}], batch {batch}, Loss: {loss.item():.4f}")
-            # Save trained model
-            torch.save(model.state_dict(), "model.pth")
+# Load tokenizer
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+# Initialize dataset and dataloader
+wmt14_dataset = WMT14Dataset(dataset, tokenizer=tokenizer)
+dataloader = DataLoader(wmt14_dataset, batch_size=16, shuffle=True, collate_fn=wmt14_dataset.collate_fn)
+
+# Initialize model, optimizer, and criterion
+autoencoder = Autoencoder("bert-base-uncased")
+optimizer = torch.optim.Adam(autoencoder.parameters(), lr=1e-4)
+criterion = nn.CrossEntropyLoss()
+
+# Define device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# Move model to device
+autoencoder.to(device)
+
+# Training loop
+num_epochs = 10
+for epoch in range(num_epochs):
+    loss = train(autoencoder, dataloader, optimizer, criterion, device)
+    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
