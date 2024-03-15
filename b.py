@@ -5,6 +5,17 @@ import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import matplotlib.pyplot as plt 
+
+
+def plot_image(real_images, generated_images, epoch):
+    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(20, 4))
+    axes[0].imshow(real_images.view(28, 28).cpu().detach().numpy(), cmap='gray')
+    axes[0].axis('off')
+    axes[1].imshow(generated_images.view(28, 28).cpu().detach().numpy(), cmap='gray')
+    axes[1].axis('off')
+    plt.savefig(f'Test_{epoch}.png')
+    plt.close()
 
 # Define the Generator network
 class Generator(nn.Module):
@@ -69,45 +80,10 @@ num_epochs = 10
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 classifier.to(device)
 
-# for epoch in range(num_epochs):
-#     running_loss = 0.0
-#     correct_predictions = 0
-#     total_predictions = 0
-
-#     for images, labels in tqdm(data_loader, desc=f"Epoch {epoch + 1}/{num_epochs}"):
-#         images = images.view(-1, 784).to(device)
-#         labels = labels.to(device)
-
-#         # Zero the parameter gradients
-#         optimizer.zero_grad()
-
-#         # Forward pass
-#         outputs = classifier(images)
-
-#         # Calculate loss
-#         loss = criterion(outputs, labels)
-
-#         # Backward pass and optimize
-#         loss.backward()
-#         optimizer.step()
-
-#         # Track the accuracy and loss
-#         running_loss += loss.item()
-#         _, predicted = torch.max(outputs.data, 1)
-#         total_predictions += labels.size(0)
-#         correct_predictions += (predicted == labels).sum().item()
-
-#     epoch_loss = running_loss / len(data_loader)
-#     epoch_accuracy = correct_predictions / total_predictions * 100
-
-#     print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}, Accuracy: {epoch_accuracy:.2f}%")
-
-# print('Training completed.')
-# torch.save(classifier.state_dict(), 'classifier.pth')
 
 
 # Testing accuracy using generated images
-def test_classifier_accuracy(generator, classifier, num_samples=1000):
+def test_classifier_accuracy(generator, classifier, num_samples=10):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     generator.to(device)
     classifier.to(device)
@@ -130,22 +106,23 @@ def test_classifier_accuracy(generator, classifier, num_samples=1000):
     total = 0
 
     with torch.no_grad():
-        for _ in range(num_samples):
+        for batch_idx, (real_image, label) in enumerate(test_loader):
             # Generate random noise and a real image
             # noise = torch.randn(1, noise_dim, device=device)
             # real_image = torch.randn(1, 784, device=device)  # Assuming random noise as input, you may change this
-            real_image, label = next(iter(test_loader))  # Take one real image from the dataset
+            # Take one real image from the dataset
             # print(label)
             real_image = real_image.view(-1, 784).to(device)
+            
             # print(real_image.size())
             # Generate a fake image using the generator
             # fake_image = generator(torch.cat([noise, real_image], dim=1))
             fake_image = generator(real_image)
-            
+            #plot_image(real_image, fake_image, batch_idx)
             # Pass the fake image through the classifier
             outputs = classifier(fake_image)
             _, predicted = torch.max(outputs.data, 1)
-            # print(predicted)
+           
             # Increment counters
             total += 1
             if predicted.item() == label.item():  # Check if the predicted label is the same as the generated image label

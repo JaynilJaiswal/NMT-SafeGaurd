@@ -146,13 +146,14 @@ if not generator_trained:
 
             # Total generator loss
             generator_loss = (1-cosine_similarity) + torch.mean(adversarial_loss)
+            #print(torch.mean(adversarial_loss).item())
             generator_loss.backward()
             gen_optimizer.step()
 
             gen_loss_sum += generator_loss.item()
             pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader)})
         
-        if epoch % 2 == 0:
+        if epoch % 1 == 0:
             # Plot and save real and generated images every epoch
             plot_images(images[:10], generated_images[:10], epoch)
     torch.save(generator.state_dict(), 'generator.pth')
