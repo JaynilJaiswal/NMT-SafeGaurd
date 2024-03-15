@@ -40,7 +40,10 @@ class AdversarialLoss(nn.Module):
         super(AdversarialLoss, self).__init__()
 
     def forward(self, pred, target):
-        return 
+        logs = torch.log(pred)
+        for i in range(target.shape[0]):
+            logs[i, target[i].item()] = 0
+        return -torch.sum(logs, dim=1) / (pred.shape[1])
     
 
 #################### LOAD DATASET ####################
@@ -138,30 +141,19 @@ if not generator_trained:
             generator.zero_grad()
             generated_images = generator(images)
 
-
-            print(labels)
-            print(classifier(generated_images))
-
-            
-            cosine_similarity = F.cosine_similarity(generated_images, images, dim=1).mean()     # Cosine similarity loss
-            generator_loss_disc = criterion(classifier(generated_images), labels)               # Adversarial loss from classifier
+            cosine_similarity = F.cosine_similarity(generated_images, images, dim=1).mean() # Cosine similarity loss
+            adversarial_loss = criterion(classifier(generated_images), labels)              # Adversarial loss from classifier
 
             # Total generator loss
-            generator_loss = (1-cosine_similarity) + generator_loss_disc
+            generator_loss = (1-cosine_similarity) + torch.mean(adversarial_loss)
             generator_loss.backward()
             gen_optimizer.step()
 
             gen_loss_sum += generator_loss.item()
-
-            pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader),
-                            'Discriminator Loss': disc_loss_sum / len(data_loader)})
+            pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader)})
         
         if epoch % 2 == 0:
             # Plot and save real and generated images every epoch
             plot_images(images[:10], generated_images[:10], epoch)
-            # Save models
-            torch.save(generator.state_dict(), 'generator.pth')
-print("Training completed.")
-
-# Save models
-torch.save(generator.state_dict(), 'generator.pth')
+    torch.save(generator.state_dict(), 'generator.pth')
+    print("Training completed.")
