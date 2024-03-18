@@ -1,70 +1,41 @@
 import torch
-from transformers import MarianMTModel, DistilBertForSequenceClassification, DistilBertTokenizer,  AdamW, get_linear_schedule_with_warmup
+import torch.nn as nn
+from transformers import BertModel, BertTokenizer
 
 
-class CustomMTModel(torch.nn.Module):
-    def __init__(self, device):
-        super(CustomMTModel, self).__init__()
-        self.marian_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-de")
-        self.marian_model.to(device)
+class Autoencoder(nn.Module):
+    def __init__(self, pretrained_model_name):
+        super(Autoencoder, self).__init__()
+        self.encoder = BertModel.from_pretrained("bert-base-uncased")
+        self.decoder = nn.TransformerDecoder(
+            nn.TransformerDecoderLayer(d_model=768, nhead=8),
+            num_layers=6
+        )
+        self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+        self.vocab_size = self.tokenizer.vocab_size
 
-    def forward(self, en_input, en_mask, de_input, de_mask):
-        outputs = self.marian_model(input_ids=en_input, attention_mask=en_mask, decoder_input_ids = de_input, decoder_attention_mask = de_mask)
-        return outputs
+    def forward(self, input_ids, attention_mask):
+        # Encode input sequence
+        encoder_output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        encoded_sequence = encoder_output.last_hidden_state
+        
+        # Decode encoded sequence autoregressively
+        decoded_sequence = self.decode(encoded_sequence)
+        
+        return decoded_sequence
 
-class CustomDiscriminator(torch.nn.Module):
-    def __init__(self, device, num_labels=2):
-        super(CustomDiscriminator, self).__init__()
-        # Initialize a DistilBERT model for sequence classification
-        self.distilbert_model = DistilBertForSequenceClassification.from_pretrained('distilbert-base-multilingual-cased', num_labels=num_labels)
-        self.distilbert_model.to(device)
-        # Initialize a tokenizer for DistilBERT
-        self.tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-multilingual-cased')
-        self.device = device
-
-    def forward(self, text_sequences):
-        # Tokenize the input sequences and convert them to tensors
-        inputs = self.tokenizer(text_sequences, return_tensors='pt', padding=True, truncation=True, max_length=512)
-        inputs = inputs.to(self.device)
-
-        # Pass the inputs to the DistilBERT model
-        outputs = self.distilbert_model(**inputs)
-
-        return outputs.logits
-
-
-class TranslationGAN(torch.nn.Module):
-    def __init__(self, device, generator, discriminator):
-        super(TranslationGAN, self).__init__()
-        self.generator = generator
-        self.discriminator = discriminator
-        self.device = device
-
-    def forward(self, src_input, src_mask, tgt_input, tgt_mask):
-        # Generate fake translations
-        gen_outputs = self.generator(src_input, src_mask, tgt_input, tgt_mask)
-        fake_translations = gen_outputs.logits.argmax(-1)
-
-        # Discriminate real and fake translations
-        real_discrimination = self.discriminator(tgt_input)
-        fake_discrimination = self.discriminator(fake_translations)
-
-        return real_discrimination, fake_discrimination
-
-class CustomLoss(nn.Module):
-    def __init__(self, alpha=0.5):
-        super(CustomLoss, self).__init__()
-        self.alpha = alpha
-        self.cosine_similarity = nn.CosineSimilarity()
-        self.adversarial_loss = nn.CrossEntropyLoss()
-
-    def forward(self, generated_images, real_images, labels):
-        cos_sim_loss = 1 - self.cosine_similarity(generated_images, real_images).mean()
-        adv_loss = self.adversarial_loss(generated_images, labels)
-        return self.alpha * cos_sim_loss + (1 - self.alpha) * adv_loss
-
-
-
-
-
-
+    def decode(self, encoded_sequence):
+        batch_size, seq_length, hidden_size = encoded_sequence.size()
+        decoder_input_ids = torch.zeros((batch_size, 1), dtype=torch.long).to(encoded_sequence.device)
+        
+        # Autoregressive decoding
+        for step in range(seq_length):
+            decoder_output = self.decoder(
+                memory=encoded_sequence,
+                tgt=self.tokenizer(decoder_input_ids, return_tensors='pt').input_ids,
+            )
+            next_token_logits = decoder_output[0][:, -1, :]  # logits for the next token
+            next_token_id = next_token_logits.argmax(-1)     # get the index of the highest probability token
+            decoder_input_ids = torch.cat([decoder_input_ids, next_token_id.unsqueeze(-1)], dim=-1)
+        
+        return decoder_input_ids[:, 1:]  # remove the initial padding token
