@@ -18,7 +18,7 @@ from arguments import params
 # with open('all_inputs_250', 'rb') as f:
 #     data = pickle.load(f)
 # Load WMT14 dataset from Hugging Face
-dataset = load_dataset("wmt14", "de-en")
+# dataset = load_dataset("wmt14", "de-en")
 
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
