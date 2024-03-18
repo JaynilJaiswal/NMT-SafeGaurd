@@ -9,5 +9,5 @@ def load_data():
 def load_tokenizer(args):
     # task1: load bert tokenizer from pretrained "bert-base-uncased", you can also set truncation_side as "left" 
     #tokenizer = BertTokenizer.from_pretrained(...)
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", truncation_side='left') # "google-bert/bert-base-uncased"  
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased") # "google-bert/bert-base-uncased"  
     return tokenizer
