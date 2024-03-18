@@ -58,23 +58,12 @@ class AdversarialLoss(nn.Module):
         super(AdversarialLoss, self).__init__()
 
     def forward(self, pred, target):
-        batch_size = pred.size(0)
-        num_classes = pred.size(1)
-        
-        # Create a mask to zero out the log probabilities for the target classes
-        mask = torch.ones(batch_size, num_classes, dtype=torch.bool, device=pred.device)
-        mask[torch.arange(batch_size), target] = 0
-        
-        # Zero out the log probabilities for the target classes
-        pred_masked = pred.masked_fill(mask.unsqueeze(-1), -float('inf'))
-        
-        # Calculate the loss for each sample
-        loss_per_sample = -torch.sum(pred_masked, dim=1) / num_classes
-        
-        # Calculate the average loss over the batch
-        loss = torch.mean(loss_per_sample)
-        
-        return loss
+        # Zero out the log probabilities corresponding to the target class
+        logs = torch.log(torch.sigmoid(pred))
+        logs = logs.scatter(1, target.unsqueeze(1), 0)  # Set log probabilities of target class to 0
+        # print(pred[0],logs[0], target)
+        return -torch.sum(logs, dim=1) / pred.shape[0]
+
 
 
 def run_eval(args, model, datasets, tokenizer, split='validation'):
@@ -159,7 +148,7 @@ def train(model, intent_classifier, dataloader, optimizer, criterion, adversaria
         decoded_sequences = torch.argmax(logits, dim=-1)  # Shape: (batch_size, sequence_length)
         
         # Pass token IDs to the intent classifier
-        intent_logits = intent_classifier(decoded_sequences*attention_mask)
+        intent_logits = intent_classifier({"input_ids":decoded_sequences*attention_mask, "attention_mask":attention_mask})
         
         reconstruction_loss = criterion(logits, input_ids)
         
@@ -167,9 +156,10 @@ def train(model, intent_classifier, dataloader, optimizer, criterion, adversaria
         with torch.no_grad():
             adversarial_target = torch.argmax(intent_logits, dim=1)  # get the target class
         adversarial_loss_value = adversarial_loss(intent_logits, adversarial_target)
-        
+        # print(reconstruction_loss, adversarial_loss_value)
+
         # Total loss
-        loss = reconstruction_loss + 0.1 * adversarial_loss_value
+        loss = reconstruction_loss + 0.1 * adversarial_loss_value.mean()
         
         # print(reconstructed_logits.view(-1, reconstructed_logits.size(-1))[0], input_ids.size())
         # loss = criterion(reconstructed_ids*attention_mask, input_ids)
@@ -202,8 +192,8 @@ if __name__ == '__main__':
     
     classifier = IntentModel(args, tokenizer, target_size=60).to(device)
     classifier_pretrained = load_model(classifier, "text_classifier.pth")
-    if not classifier_pretrained:
-        baseline_train(args, classifier, datasets, tokenizer)    
+    # if not classifier_pretrained:
+    #     baseline_train(args, classifier, datasets, tokenizer)    
     
     
     dataloader = get_dataloader(args, datasets['train'], split='train')  #/////////// might need to change
@@ -222,7 +212,7 @@ if __name__ == '__main__':
     autoencoder.to(device)
 
     # Training loop
-    # num_epochs = 10
-    # for epoch in range(num_epochs):
-    #     loss = train(autoencoder, classifier, dataloader, optimizer, criterion, device)
-    #     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
+    num_epochs = 10
+    for epoch in range(num_epochs):
+        loss = train(autoencoder, classifier, dataloader, optimizer, criterion, adversarial_loss, device)
+        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
