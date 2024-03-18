@@ -32,6 +32,7 @@ def compute_loss(outputs, targets):
 # Training loop
 num_epochs = 5
 for epoch in range(num_epochs):
+<<<<<<< Updated upstream
     for batch in dataloader:
         # Unpack batch
         # for x in batch:
@@ -57,3 +58,32 @@ for epoch in range(num_epochs):
             print(f"Epoch [{epoch + 1}/{num_epochs}], batch {batch}, Loss: {loss.item():.4f}")
             # Save trained model
             torch.save(model.state_dict(), "model.pth")
+=======
+    loss = train(autoencoder, dataloader, optimizer, criterion, device)
+    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
+    
+# function that both generates adversarial examples and evaluates the classifier:
+def evaluate_adversarial_examples(generator, classifier, data_loader, device):
+    generator.eval()
+    classifier.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for images, labels in data_loader:
+            images = images.to(device)
+            labels = labels.to(device)
+
+            # Generate adversarial examples
+            adversarial_images = generator(images)
+
+            # Evaluate classifier on adversarial examples
+            outputs = classifier(adversarial_images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total
+    print(f'Accuracy of the classifier on adversarial examples: {accuracy:.2f}%')
+    return accuracy
+>>>>>>> Stashed changes
