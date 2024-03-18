@@ -192,8 +192,8 @@ if __name__ == '__main__':
     
     classifier = IntentModel(args, tokenizer, target_size=60).to(device)
     classifier_pretrained = load_model(classifier, "text_classifier.pth")
-    # if not classifier_pretrained:
-    #     baseline_train(args, classifier, datasets, tokenizer)    
+    if not classifier_pretrained:
+        baseline_train(args, classifier, datasets, tokenizer)    
     
     
     dataloader = get_dataloader(args, datasets['train'], split='train')  #/////////// might need to change
