@@ -51,6 +51,17 @@ class TranslationGAN(torch.nn.Module):
 
         return real_discrimination, fake_discrimination
 
+class CustomLoss(nn.Module):
+    def __init__(self, alpha=0.5):
+        super(CustomLoss, self).__init__()
+        self.alpha = alpha
+        self.cosine_similarity = nn.CosineSimilarity()
+        self.adversarial_loss = nn.CrossEntropyLoss()
+
+    def forward(self, generated_images, real_images, labels):
+        cos_sim_loss = 1 - self.cosine_similarity(generated_images, real_images).mean()
+        adv_loss = self.adversarial_loss(generated_images, labels)
+        return self.alpha * cos_sim_loss + (1 - self.alpha) * adv_loss
 
 
 

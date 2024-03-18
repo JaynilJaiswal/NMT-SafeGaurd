@@ -255,6 +255,61 @@ if not generator_trained:
     torch.save(generator.state_dict(), 'generator_cifar.pth')
     print("Training completed.")
 
+# Adversarial training: 
+def adversarial_training(classifier, generator, data_loader, optimizer, epochs=10):
+    classifier.train()
+    for epoch in range(epochs):
+        for images, labels in data_loader:
+            optimizer.zero_grad()
+
+            # Generate adversarial examples
+            adversarial_images = generator(images)
+
+            # Train on both real and adversarial images
+            real_outputs = classifier(images)
+            adversarial_outputs = classifier(adversarial_images)
+            
+            loss = (nn.CrossEntropyLoss()(real_outputs, labels) +
+                    nn.CrossEntropyLoss()(adversarial_outputs, labels)) / 2
+            loss.backward()
+            optimizer.step()
+
+# Robustness to Defense Mechanisms and Adversarial Success Rate:
+def evaluate_defense_mechanisms(model, defense_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in defense_loader:
+            # Apply defense mechanisms here (e.g., image smoothing, feature squeezing)
+            defended_images = plot_images(images)
+
+            outputs = model(defended_images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total
+    return accuracy
+
+def calculate_adversarial_success_rate(generator, classifier, data_loader):
+    classifier.eval()
+    success_count = 0
+    total_count = 0
+
+    with torch.no_grad():
+        for images, labels in data_loader:
+            adversarial_images = generator(images)
+            outputs = classifier(adversarial_images)
+            _, predicted = torch.max(outputs.data, 1)
+            
+            # Increment success count if the prediction is incorrect
+            success_count += (predicted != labels).sum().item()
+            total_count += labels.size(0)
+
+    success_rate = 100 * success_count / total_count
+    return success_rate
+
 # benchmark for: Classification Accuracy Drop
 # Evaluate the classifier on the original dataset
 original_accuracy = test_generator(classifier, data_loader, device)
