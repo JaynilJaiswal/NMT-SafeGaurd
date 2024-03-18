@@ -100,7 +100,7 @@ class AdversarialLoss(nn.Module):
         super(AdversarialLoss, self).__init__()
 
     def forward(self, pred, target):
-        logs = torch.log(pred)
+        logs = torch.log(torch.sigmoid(pred))
         for i in range(target.shape[0]):
             logs[i, target[i].item()] = 0
         return -torch.sum(logs, dim=1) / (pred.shape[1])
@@ -139,13 +139,15 @@ classifier.to(device)
 
 #################### PLOT IMAGE FUNCTION ####################
 def plot_images(real_images, generated_images, epoch):
-    print(real_images.size())
+    # print(real_images.size())
     fig, axes = plt.subplots(nrows=2, ncols=10, figsize=(20, 4))
     for ax, image in zip(axes[0], real_images):
-        print(image.size())
+        # print(image.size())
+        image = image /2 +0.5
         ax.imshow(np.transpose(image.cpu().detach().numpy(), (1,2,0)))
         ax.axis('off')
     for ax, image in zip(axes[1], generated_images):
+        image = image /2 +0.5
         ax.imshow(np.transpose(image.cpu().detach().numpy(), (1,2,0)))
         ax.axis('off')
     plt.savefig(f'comparison_epoch_{epoch}_cifar.png')
@@ -200,84 +202,87 @@ if not generator_trained:
     for epoch in range(num_epochs_gen):
         gen_loss_sum = 0.0
         disc_loss_sum = 0.0
-        pbar = tqdm(data_loader, total=len(data_loader), desc=f"Epoch {epoch + 1}/{num_epochs}")
+        pbar = tqdm(data_loader, total=len(data_loader), desc=f"Epoch {epoch + 1}/{num_epochs_gen}")
         for images, labels in pbar:
             
             images = images.to(device)
             # images = images.to(device)
             generator.zero_grad()
             generated_images = generator(images)
-            cosine_similarity = F.cosine_similarity(generated_images, images, dim=1).mean() # Cosine similarity loss
+            # cosine_similarity = F.cosine_similarity(generated_images, images, dim=1).mean() # Cosine similarity loss
             generated_images = generated_images.view(-1,3,32,32)
             adversarial_loss = criterion(classifier(generated_images), labels)              # Adversarial loss from classifier
 
             # Total generator loss
-            generator_loss = (1-cosine_similarity) + 0.05*torch.mean(adversarial_loss)
+            # print(cosine_similarity, adversarial_loss.mean())
+            generator_loss = F.mse_loss(generated_images, images, reduction="mean") + 0.01*adversarial_loss.mean()
+            # generator_loss = (1-cosine_similarity) + 0.01*torch.mean(adversarial_loss)
             generator_loss.backward()
             gen_optimizer.step()
 
             gen_loss_sum += generator_loss.item()
-            pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader)})
+            pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader), "Adversarial Loss":0.01*adversarial_loss.mean().item()})
         
-        if epoch % 1 == 0:
+        if epoch % 2 == 0:
             images = images.view(-1,3,32,32)
             generated_images = generated_images.view(-1,3,32,32)
+            # print(generated_images[0].min(),images[0].min())
             plot_images(images[:10], generated_images[:10], epoch)
-    torch.save(generator.state_dict(), 'generator_cifar.pth')
-    print("Training completed.")
+        torch.save(generator.state_dict(), 'generator_cifar.pth')
+print("Training completed.")
 
 
-# noise_dim = 100
+noise_dim = 100
 
 
-# # Testing accuracy using generated images
-# def test_classifier_accuracy(generator, classifier, num_samples=10):
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     generator.to(device)
-#     classifier.to(device)
-#     # Define data transformations
-#     transform = transforms.Compose([
-#         transforms.ToTensor(),
-#         transforms.Normalize((0.5,), (0.5,))
-#     ])
+# Testing accuracy using generated images
+def test_classifier_accuracy(generator, classifier, num_samples=10):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    generator.to(device)
+    classifier.to(device)
+    # Define data transformations
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
+    ])
 
-#     # Load MNIST test dataset
-#     mnist_test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transform, download=True)
+    # Load MNIST test dataset
+    mnist_test_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, transform=transform, download=True)
 
-#     # Define DataLoader for the test dataset
-#     test_loader = DataLoader(mnist_test_dataset, batch_size=1, shuffle=False)
+    # Define DataLoader for the test dataset
+    test_loader = DataLoader(mnist_test_dataset, batch_size=1, shuffle=False)
 
-#     generator.eval()
-#     classifier.eval()
+    generator.eval()
+    classifier.eval()
 
-#     correct = 0
-#     total = 0
+    correct = 0
+    total = 0
 
-#     with torch.no_grad():
-#         for batch_idx, (real_image, label) in enumerate(test_loader):
-#             # Generate random noise and a real image
-#             # noise = torch.randn(1, noise_dim, device=device)
-#             # real_image = torch.randn(1, 784, device=device)  # Assuming random noise as input, you may change this
-#             # Take one real image from the dataset
-#             # print(label)
-#             real_image = real_image.view(-1, 784).to(device)
+    with torch.no_grad():
+        for batch_idx, (real_image, label) in enumerate(test_loader):
+            # Generate random noise and a real image
+            # noise = torch.randn(1, noise_dim, device=device)
+            # real_image = torch.randn(1, 784, device=device)  # Assuming random noise as input, you may change this
+            # Take one real image from the dataset
+            # print(label)
+            real_image = real_image.view(-1,3,32,32).to(device)
             
-#             # print(real_image.size())
-#             # Generate a fake image using the generator
-#             # fake_image = generator(torch.cat([noise, real_image], dim=1))
-#             fake_image = generator(real_image)
-#             #plot_image(real_image, fake_image, batch_idx)
-#             # Pass the fake image through the classifier
-#             outputs = classifier(real_image)
-#             _, predicted = torch.max(outputs.data, 1)
+            # print(real_image.size())
+            # Generate a fake image using the generator
+            # fake_image = generator(torch.cat([noise, real_image], dim=1))
+            fake_image = generator(real_image)
+            #plot_image(real_image, fake_image, batch_idx)
+            # Pass the fake image through the classifier
+            outputs = classifier(fake_image)
+            _, predicted = torch.max(outputs.data, 1)
            
-#             # Increment counters
-#             total += 1
-#             if predicted.item() == label.item():  # Check if the predicted label is the same as the generated image label
-#                 correct += 1
+            # Increment counters
+            total += 1
+            if predicted.item() == label.item():  # Check if the predicted label is the same as the generated image label
+                correct += 1
 
-#     accuracy = correct / total * 100
-#     print(f"Accuracy of the classifier using generated images: {accuracy:.2f}%")
+    accuracy = correct / total * 100
+    print(f"Accuracy of the classifier using generated images: {accuracy:.2f}%")
 
-# # Test classifier accuracy using generated images
-# test_classifier_accuracy(generator, classifier)
+# Test classifier accuracy using generated images
+test_classifier_accuracy(generator, classifier)
