@@ -13,6 +13,7 @@ from main import evaluate_adversarial_examples
 from c import test_generator
 import torch
 from torch.utils.data import TensorDataset, DataLoader
+from project_loss import CustomLoss
 
 
 #################### DEFINE MODELS AND CUSTOM LOSS ####################

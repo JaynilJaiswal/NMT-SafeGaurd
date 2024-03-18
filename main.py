@@ -5,6 +5,7 @@ from transformers import BertTokenizer
 from model import Autoencoder
 from utils import WMT14Dataset
 from datasets import load_dataset
+from project_loss import CustomLoss
 
 
 
@@ -13,7 +14,7 @@ from datasets import load_dataset
 # with open('all_inputs_250', 'rb') as f:
 #     data = pickle.load(f)
 # Load WMT14 dataset from Hugging Face
-dataset = load_dataset("wmt14", "de-en")
+dataset = load_dataset("wmt14", "de-en", trust_remote_code=True)
 
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
