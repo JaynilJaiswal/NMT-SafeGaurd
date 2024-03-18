@@ -29,7 +29,7 @@ class SequenceReconstructionLoss(nn.Module):
         super(SequenceReconstructionLoss, self).__init__()
         self.vocab_size = vocab_size
 
-    def forward(self, pred_sequence, target_sequence):
+    def forward(self, pred_logits, target_sequence):
         """
         Compute sequence-to-sequence reconstruction loss.
 
@@ -40,20 +40,7 @@ class SequenceReconstructionLoss(nn.Module):
         Returns:
         - loss (Tensor): Sequence-to-sequence reconstruction loss.
         """
-        
-        # One-hot encode the predicted and target sequences
-        pred_sequence_onehot = F.one_hot(pred_sequence, num_classes=self.vocab_size).float()
-        pred_sequence_onehot.requires_grad = True
-        # print(pred_sequence_onehot.size())
-        # Flatten the predicted sequence to shape [batch_size * sequence_length, vocab_size]
-        # pred_sequence_flat = pred_sequence_onehot.view(-1, pred_sequence_onehot.size(-1))
-
-        # Flatten the target sequence to shape [batch_size * sequence_length]
-        # target_sequence_flat = target_sequence.view(-1)
-        # print(pred_sequence_flat.size(), target_sequence_flat.size())
-        # Compute cross-entropy loss
-        loss = F.cross_entropy(pred_sequence_onehot.permute(0,2,1), target_sequence)  # Ignore padding index
-
+        loss = F.cross_entropy(pred_logits.permute(0, 2, 1), target_sequence)
         return loss
 
 # Define training function
@@ -73,9 +60,10 @@ def train(model, dataloader, optimizer, criterion, device):
         # attention_mask = input_ids != tokenizer.pad_token_id
         # attention_mask = batch[1].squeeze().to(device)
         optimizer.zero_grad()
-        reconstructed_ids = model(input_ids, attention_mask)
+        logits = model(input_ids, attention_mask)
         # print(reconstructed_logits.view(-1, reconstructed_logits.size(-1))[0], input_ids.size())
-        loss = criterion(reconstructed_ids*attention_mask, input_ids)
+        # loss = criterion(reconstructed_ids*attention_mask, input_ids)
+        loss = criterion(logits, input_ids)
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
