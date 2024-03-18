@@ -9,7 +9,7 @@ class Autoencoder(nn.Module):
         self.encoder = BertModel.from_pretrained("bert-base-uncased")
         self.decoder = nn.TransformerDecoder(
             nn.TransformerDecoderLayer(d_model=768, nhead=8, batch_first=True),
-            num_layers=1
+            num_layers=6
         )
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.vocab_size = self.tokenizer.vocab_size
