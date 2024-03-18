@@ -53,7 +53,7 @@ class AdversarialLoss(nn.Module):
 # ])
 transform = transforms.Compose([
     transforms.RandomRotation(degrees=10),  # Randomly rotate the image by ±10 degrees.
-    transforms.RandomCrop(26, padding=4),  # Randomly crop the image and pad it to keep the size constant.
+    # transforms.RandomCrop(26, padding=4),  # Randomly crop the image and pad it to keep the size constant.
     transforms.ToTensor(),  # Convert the image to a PyTorch tensor.
     transforms.Normalize((0.5,), (0.5,)),  # Normalize pixel values.
 ])
