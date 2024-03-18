@@ -151,7 +151,7 @@ if not generator_trained:
             adversarial_loss = criterion(classifier(generated_images), labels)              # Adversarial loss from classifier
 
             # Total generator loss
-            generator_loss = (1-cosine_similarity) + torch.mean(adversarial_loss)
+            generator_loss = (1-cosine_similarity) + 0.05 * torch.mean(adversarial_loss)
             #print(torch.mean(adversarial_loss).item())
             generator_loss.backward()
             gen_optimizer.step()
