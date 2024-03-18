@@ -39,3 +39,15 @@ class Autoencoder(nn.Module):
             decoder_input_ids = torch.cat([decoder_input_ids, next_token_id.unsqueeze(-1)], dim=-1)
         
         return decoder_input_ids[:, 1:]  # remove the initial padding token
+    
+class CustomLoss(nn.Module):
+    def __init__(self, alpha=0.5):
+        super(CustomLoss, self).__init__()
+        self.alpha = alpha
+        self.cosine_similarity = nn.CosineSimilarity()
+        self.adversarial_loss = nn.CrossEntropyLoss()
+
+    def forward(self, generated_images, real_images, labels):
+        cos_sim_loss = 1 - self.cosine_similarity(generated_images, real_images).mean()
+        adv_loss = self.adversarial_loss(generated_images, labels)
+        return self.alpha * cos_sim_loss + (1 - self.alpha) * adv_loss

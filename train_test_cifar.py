@@ -9,6 +9,10 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 import numpy as np 
+from main import evaluate_adversarial_examples
+from c import test_generator
+import torch
+from torch.utils.data import TensorDataset, DataLoader
 
 
 #################### DEFINE MODELS AND CUSTOM LOSS ####################
@@ -115,6 +119,30 @@ transform = transforms.Compose([
 cifar_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
 data_loader = DataLoader(cifar_dataset, batch_size=128, shuffle=True)
 
+# creating a dataset of adversarial examples and then using this dataset to initialize a DataLoader:
+def create_adversarial_data_loader(generator, original_data_loader, device):
+    generator.eval()
+    adversarial_images = []
+    labels = []
+
+    with torch.no_grad():
+        for data, target in original_data_loader:
+            data = data.to(device)
+            adversarial_data = generator(data)
+            adversarial_images.append(adversarial_data.cpu())
+            labels.append(target)
+
+    # Concatenate all the adversarial images and labels
+    adversarial_images = torch.cat(adversarial_images, 0)
+    labels = torch.cat(labels, 0)
+
+    # Create a TensorDataset with adversarial images
+    adversarial_dataset = TensorDataset(adversarial_images, labels)
+
+    # Create a DataLoader from the adversarial dataset
+    adversarial_data_loader = DataLoader(adversarial_dataset, batch_size=original_data_loader.batch_size, shuffle=False)
+
+    return adversarial_data_loader
 
 #################### LOAD MODELS ####################
 generator = Generator()
@@ -226,6 +254,74 @@ if not generator_trained:
             plot_images(images[:10], generated_images[:10], epoch)
     torch.save(generator.state_dict(), 'generator_cifar.pth')
     print("Training completed.")
+
+# Adversarial training: 
+def adversarial_training(classifier, generator, data_loader, optimizer, epochs=10):
+    classifier.train()
+    for epoch in range(epochs):
+        for images, labels in data_loader:
+            optimizer.zero_grad()
+
+            # Generate adversarial examples
+            adversarial_images = generator(images)
+
+            # Train on both real and adversarial images
+            real_outputs = classifier(images)
+            adversarial_outputs = classifier(adversarial_images)
+
+            loss = (nn.CrossEntropyLoss()(real_outputs, labels) +
+                    nn.CrossEntropyLoss()(adversarial_outputs, labels)) / 2
+            loss.backward()
+            optimizer.step()
+
+# Robustness to Defense Mechanisms and Adversarial Success Rate:
+def evaluate_defense_mechanisms(model, defense_loader):
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for images, labels in defense_loader:
+            # Apply defense mechanisms here (e.g., image smoothing, feature squeezing)
+            defended_images = plot_images(images)
+
+            outputs = model(defended_images)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total
+    return accuracy
+
+def calculate_adversarial_success_rate(generator, classifier, data_loader):
+    classifier.eval()
+    success_count = 0
+    total_count = 0
+
+    with torch.no_grad():
+        for images, labels in data_loader:
+            adversarial_images = generator(images)
+            outputs = classifier(adversarial_images)
+            _, predicted = torch.max(outputs.data, 1)
+
+            # Increment success count if the prediction is incorrect
+            success_count += (predicted != labels).sum().item()
+            total_count += labels.size(0)
+
+    success_rate = 100 * success_count / total_count
+    return success_rate
+
+# benchmark for: Classification Accuracy Drop
+# Evaluate the classifier on the original dataset
+original_accuracy = test_generator(classifier, data_loader, device)
+# Evaluate the classifier on adversarial examples
+adversarial_data_loader = create_adversarial_data_loader(generator, data_loader, device)
+adversarial_accuracy = evaluate_adversarial_examples(generator, classifier, adversarial_data_loader, device)
+
+# Calculate the accuracy drop
+accuracy_drop = original_accuracy - adversarial_accuracy
+print(f'Original Accuracy: {original_accuracy:.2f}%')
+print(f'Adversarial Accuracy: {adversarial_accuracy:.2f}%')
+print(f'Accuracy Drop: {accuracy_drop:.2f}%')
 
 
 # noise_dim = 100
