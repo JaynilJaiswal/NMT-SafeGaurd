@@ -47,9 +47,15 @@ class AdversarialLoss(nn.Module):
     
 
 #################### LOAD DATASET ####################
+# transform = transforms.Compose([
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.5,), (0.5,))
+# ])
 transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.5,), (0.5,))
+    transforms.RandomRotation(degrees=10),  # Randomly rotate the image by ±10 degrees.
+    transforms.RandomCrop(26, padding=4),  # Randomly crop the image and pad it to keep the size constant.
+    transforms.ToTensor(),  # Convert the image to a PyTorch tensor.
+    transforms.Normalize((0.5,), (0.5,)),  # Normalize pixel values.
 ])
 mnist_dataset = torchvision.datasets.MNIST(root='./data', train=True, transform=transform, download=True)
 data_loader = DataLoader(mnist_dataset, batch_size=128, shuffle=True)
