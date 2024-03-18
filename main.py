@@ -4,6 +4,15 @@ from utils import *
 from torch.utils.data import DataLoader
 import pickle
 
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+from transformers import BertTokenizer
+from model import Autoencoder
+from utils import WMT14Dataset
+from datasets import load_dataset
+
+
+# changes not made///
 
 # Load data from pickle file
 with open('all_inputs_250', 'rb') as f:
