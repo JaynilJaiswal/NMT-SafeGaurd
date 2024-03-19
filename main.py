@@ -35,7 +35,7 @@ for k,v in datasets.items():
 
 
 #################### LOAD/TRAIN MODELS ####################
-intent_encoder = IntentEncoder(tokenizer)
+intent_encoder = IntentEncoder(args, tokenizer)
 intent_classifier = IntentClassifier(args, intent_encoder=intent_encoder)
 
 def load_model(model, model_name):

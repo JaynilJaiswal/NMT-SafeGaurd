@@ -4,14 +4,14 @@ from transformers import BertModel, BertTokenizer
 from torch.nn import functional as F
 
 class IntentEncoder(nn.Module):
-    def __init__(self, tokenizer, target_size=60, feat_dim=768):
+    def __init__(self, args, tokenizer, target_size=60, feat_dim=768):
         super().__init__()
         self.tokenizer = tokenizer
         self.encoder = BertModel.from_pretrained('bert-base-uncased')
         self.encoder.resize_token_embeddings(len(self.tokenizer)) 
         self.target_size = target_size
-        self.dropout = nn.Dropout(p=0.1)
-        self.head = nn.Linear(feat_dim, 768)
+        self.dropout = nn.Dropout(args.dropout)
+        self.head = nn.Linear(feat_dim, args.embed_dim)
 
     def forward(self, inputs):
         out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
@@ -34,13 +34,14 @@ class IntentClassifier(nn.Module):
         return logit
     
 
-class Autoencoder(nn.Module):
-    def __init__(self, tokenizer, target_size):
+class Generator(nn.Module):
+    def __init__(self, args, tokenizer, target_size=60, feat_dim=768):
         super(Autoencoder, self).__init__()
         self.tokenizer = tokenizer
         self.encoder = BertModel.from_pretrained("bert-base_uncased")
         self.encoder.resize_token_embeddings(len(self.tokenizer))
-        self.head = nn.Linear()
+        self.target_size = target_size
+        self.head = nn.Linear(feat_dim, args.embed_dim)
 
     def forward(self, inputs):
         out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
