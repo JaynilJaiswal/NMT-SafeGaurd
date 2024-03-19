@@ -111,10 +111,6 @@ def run_eval(args, model, datasets, split='validation'):
     for step, batch in progress_bar(enumerate(dataloader), total=len(dataloader)):
         inputs, labels = prepare_inputs(batch)
         logits = model(inputs)
-
-        print(logits)
-        exit()
-
         acc += (logits.argmax(1) == labels).float().sum().item()
     print(f'{split} acc:', acc/len(datasets[split]), f'|dataset split {split} size:', len(datasets[split]))
 

@@ -36,9 +36,9 @@ class IntentClassifier(nn.Module):
 
 class Generator(nn.Module):
     def __init__(self, args, tokenizer, target_size=60, feat_dim=768):
-        super(Autoencoder, self).__init__()
+        super(Generator, self).__init__()
         self.tokenizer = tokenizer
-        self.encoder = BertModel.from_pretrained("bert-base_uncased")
+        self.encoder = BertModel.from_pretrained("bert-base-uncased")
         self.encoder.resize_token_embeddings(len(self.tokenizer))
         self.target_size = target_size
         self.head = nn.Linear(feat_dim, args.embed_dim)
