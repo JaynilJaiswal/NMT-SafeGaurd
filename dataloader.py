@@ -25,11 +25,9 @@ def prepare_inputs(batch, use_text=False):
         This function converts the batch of variables to input_ids, token_type_ids and attention_mask which the 
         BERT encoder requires. It also separates the targets (ground truth labels) for supervised-loss.
     """
-
     btt = [b.to(device) for b in batch[:4]]
     inputs = {'input_ids': btt[0], 'token_type_ids': btt[1], 'attention_mask': btt[2]} 
     targets = btt[3]
-
     if use_text:
         target_text = batch[4]
         return inputs, targets, target_text
@@ -38,10 +36,9 @@ def prepare_inputs(batch, use_text=False):
 
 def check_cache(args):
     folder = 'cache'
-    cache_path = os.path.join(args.input_dir, folder, f'{args.dataset}.pkl')
-    use_cache = not args.ignore_cache
+    cache_path = os.path.join(args.input_dir, folder, 'amazon.pkl')
 
-    if os.path.exists(cache_path) and use_cache:
+    if os.path.exists(cache_path):
         print(f'Loading features from cache at {cache_path}')
         results = pkl.load( open( cache_path, 'rb' ) )
         return results, True
@@ -53,17 +50,11 @@ def prepare_features(args, data, tokenizer, cache_path):
     all_features = {}
 
     for split, examples in data.items():
-        
         feats = []
-        # task1: process examples using tokenizer. Wrap it using BaseInstance class and append it to feats list.
         for example in progress_bar(examples, total=len(examples)):
             # tokenizer: set padding to 'max_length', set truncation to True, set max_length to args.max_len
-            #embed_data = tokenizer(...)
             embed_data = tokenizer(example['text'], padding='max_length', truncation=True, max_length=args.max_len) 
-
-            instance = BaseInstance(embed_data, example)
-            feats.append(instance)
-        # print(embed_data, example)
+            feats.append(BaseInstance(embed_data, example))
         all_features[split] = feats
         print(f'Number of {split} features:', len(feats))
 
@@ -72,12 +63,10 @@ def prepare_features(args, data, tokenizer, cache_path):
 
 def process_data(args, features, tokenizer):
   train_size, dev_size = len(features['train']), len(features['validation'])
-
   datasets = {}
   for split, feat in features.items():
       ins_data = feat
       datasets[split] = IntentDataset(ins_data, tokenizer, split)
-
   return datasets
 
 class BaseInstance(object):

@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from transformers import BertTokenizer
-from transformers import AdamW, get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from model import IntentEncoder, IntentClassifier, Autoencoder
 from datasets import load_dataset
 from tqdm import tqdm as progress_bar
@@ -35,11 +34,9 @@ for k,v in datasets.items():
 
 
 
-
-
 #################### LOAD/TRAIN MODELS ####################
-intent_encoder = IntentEncoder(args, tokenizer, target_size=60)
-intent_classifier = IntentClassifier(args, tokenizer, target_size=60)
+intent_encoder = IntentEncoder(tokenizer)
+intent_classifier = IntentClassifier(args, intent_encoder=intent_encoder)
 
 def load_model(model, model_name):
     '''Check if pre-trained models exist and load them'''
@@ -51,14 +48,15 @@ def load_model(model, model_name):
         print(f"No pre-trained model found. Training from scratch.")
         return False
 
-intent_encoder_trained = load_model(intent_encoder, 'intent_encoder.pth')
-intent_classifier_trained = load_model(intent_classifier, 'intent_classifier.pth')
-
+intent_encoder_trained = load_model(intent_encoder, 'intent-encoder.pth')
+intent_classifier_trained = load_model(intent_classifier, 'intent-classifier.pth')
 intent_encoder.to(device)
 intent_classifier.to(device)
 
 if not intent_classifier_trained:
     train(args, intent_classifier, datasets)
+    torch.save(intent_encoder.state_dict(), 'intent-encoder.pth')
+    torch.save(intent_classifier.state_dict(), 'intent-classifier.pth')
     
 
 

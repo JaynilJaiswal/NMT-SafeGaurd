@@ -115,7 +115,7 @@ def train(args, model, datasets):
         model.train()
 
         for step, batch in progress_bar(enumerate(train_dataloader), total=len(train_dataloader)):
-            inputs, labels = prepare_inputs(batch, model, use_text=False)
+            inputs, labels = prepare_inputs(batch)
             num_views = 2 
             embeddings_list = []
             for _ in range(num_views):
