@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from transformers import BertTokenizer
-from model import IntentEncoder, IntentClassifier, Autoencoder
+from model import IntentEncoder, IntentClassifier, Generator
 from datasets import load_dataset
 from tqdm import tqdm as progress_bar
 import torch.nn.functional as F
@@ -57,9 +57,16 @@ if not intent_classifier_trained:
     train(args, intent_classifier, datasets)
     torch.save(intent_encoder.state_dict(), 'intent-encoder.pth')
     torch.save(intent_classifier.state_dict(), 'intent-classifier.pth')
-    
 
+intent_generator = Generator(args, tokenizer)
+intent_generator_trained = load_model(intent_generator, 'intent-generator.pth')
+intent_generator.to(device)
 
+# if not intent_generator_trained:
+#     pass
+
+from train import run_eval
+run_eval(args, intent_classifier, datasets)
 
 
         

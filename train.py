@@ -94,13 +94,27 @@ class Loss(nn.Module):
 
         return loss
     
+class AdversarialLoss(nn.Module):
+    def __init__(self):
+        super(AdversarialLoss, self).__init__()
+
+    def forward(self, pred, target):
+        logs = torch.log(pred)
+        for i in range(target.shape[0]):
+            logs[i, target[i].item()] = 0
+        return -torch.sum(logs, dim=1) / (pred.shape[1])
+
 def run_eval(args, model, datasets, split='validation'):
     model.eval()
     dataloader = get_dataloader(args, datasets[split], split)
     acc = 0
     for step, batch in progress_bar(enumerate(dataloader), total=len(dataloader)):
-        inputs, labels = prepare_inputs(batch, model)
+        inputs, labels = prepare_inputs(batch)
         logits = model(inputs)
+
+        print(logits)
+        exit()
+
         acc += (logits.argmax(1) == labels).float().sum().item()
     print(f'{split} acc:', acc/len(datasets[split]), f'|dataset split {split} size:', len(datasets[split]))
 
@@ -158,3 +172,16 @@ def train(args, model, datasets):
         class_scheduler.step()  # Update learning rate schedule
         run_eval(args=args, model=model, datasets=datasets)
         print('Classification epoch', epoch_count, '| losses:', losses)
+
+def train_generator(args, model, datasets):
+    criterion = Loss(temperature=args.temperature)
+    train_dataloader = get_dataloader(args, datasets['train'], split='train')
+    class_optimizer = AdamW(model.encoder.parameters(), lr=1e-5)
+    class_scheduler = get_linear_schedule_with_warmup(class_optimizer, num_warmup_steps=int(0.1*args.n_epochs), num_training_steps=args.n_epochs)
+
+    for epoch_count in range(args.n_epochs):
+        losses = 0
+        model.train()
+
+        for step, batch in progress_bar(enumerate(train_dataloader), total=len(train_dataloader)):
+            inputs, labels = prepare_inputs(batch)
