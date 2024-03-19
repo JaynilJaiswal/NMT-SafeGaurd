@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from utils import set_seed, setup_gpus, check_directories
 from dataloader import get_dataloader, check_cache, prepare_features, process_data, prepare_inputs
 from arguments import params
-from train import train
+from train import train, train_generator
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,11 +62,10 @@ intent_generator = Generator(args, tokenizer)
 intent_generator_trained = load_model(intent_generator, 'intent-generator.pth')
 intent_generator.to(device)
 
-# if not intent_generator_trained:
-#     pass
+if not intent_generator_trained:
+    train_generator(args, intent_generator, intent_classifier, datasets)
+    torch.save(intent_generator.state_dict(), 'intent-generator.pth')
 
-from train import run_eval
-run_eval(args, intent_classifier, datasets)
 
 
         

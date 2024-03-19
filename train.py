@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from transformers import AdamW, get_linear_schedule_with_warmup
 from tqdm import tqdm as progress_bar
 
@@ -169,15 +170,32 @@ def train(args, model, datasets):
         run_eval(args=args, model=model, datasets=datasets)
         print('Classification epoch', epoch_count, '| losses:', losses)
 
-def train_generator(args, model, datasets):
-    criterion = Loss(temperature=args.temperature)
+def train_generator(args, generator, classifier, datasets):
+    criterion = AdversarialLoss()
     train_dataloader = get_dataloader(args, datasets['train'], split='train')
-    class_optimizer = AdamW(model.encoder.parameters(), lr=1e-5)
-    class_scheduler = get_linear_schedule_with_warmup(class_optimizer, num_warmup_steps=int(0.1*args.n_epochs), num_training_steps=args.n_epochs)
+    gen_optimizer = AdamW(generator.encoder.parameters(), lr=1e-5)
+    gen_scheduler = get_linear_schedule_with_warmup(gen_optimizer, num_warmup_steps=int(0.1*args.n_epochs), num_training_steps=args.n_epochs)
+
+    generator.train()
+    classifier.eval()
 
     for epoch_count in range(args.n_epochs):
         losses = 0
-        model.train()
+        pb = progress_bar(enumerate(train_dataloader), total=len(train_dataloader))
+        for step, batch in pb:
+            generator.zero_grad()
 
-        for step, batch in progress_bar(enumerate(train_dataloader), total=len(train_dataloader)):
             inputs, labels = prepare_inputs(batch)
+            generated_inputs = generator(inputs)
+
+            cosine_similarity = F.cosine_similarity(generated_inputs, inputs, dim=1).mean() # Cosine similarity loss
+            adversarial_loss = criterion(classifier(generated_inputs), labels)              # Adversarial loss from classifier
+
+            # Total generator loss
+            generator_loss = (1-cosine_similarity) + 0.1*torch.mean(adversarial_loss)
+            generator_loss.backward()
+            gen_optimizer.step()
+
+            losses += generator_loss.item()
+            pb.set_postfix({'Generator Loss': losses / len(train_dataloader)})
+        gen_scheduler.step()  # Update learning rate schedule
