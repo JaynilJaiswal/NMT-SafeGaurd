@@ -3,23 +3,49 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from transformers import BertTokenizer
 from transformers import AdamW, get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
-from model import Autoencoder, IntentModel
-# from utils import WMT14Dataset
+from model import IntentEncoder, IntentClassifier, Autoencoder
 from datasets import load_dataset
 from tqdm import tqdm as progress_bar
 import torch.nn.functional as F
 from utils import set_seed, setup_gpus, check_directories
 from dataloader import get_dataloader, check_cache, prepare_features, process_data, prepare_inputs
-from load import load_data, load_tokenizer
 from arguments import params
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load data from pickle file
-# with open('all_inputs_250', 'rb') as f:
-#     data = pickle.load(f)
-# Load WMT14 dataset from Hugging Face
-# dataset = load_dataset("wmt14", "de-en")
+args = params()
+args = setup_gpus(args)
+args = check_directories(args)
+set_seed(args)
+print(args)
+
+cache_results, already_exist = check_cache(args)
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+
+if already_exist:
+    features = cache_results
+else:
+    data = load_dataset("mteb/amazon_massive_intent")
+    features = prepare_features(args, data, tokenizer, cache_results)
+datasets = process_data(args, features, tokenizer)
+for k,v in datasets.items():
+    print(k, len(v))
+
+model = IntentEncoder(args, tokenizer, target_size=60).to(device)
+
+
+
+#################### IF INTENT CLASSIFIER NOT EXIST TRAIN ####################
+
+
+supcon_train(args, model, datasets, tokenizer, args.task)
+run_eval(args, model, datasets, tokenizer, split='test')
+
+
+
+
+
 
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

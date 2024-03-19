@@ -1,16 +1,52 @@
 import torch
 import torch.nn as nn
 from transformers import BertModel, BertTokenizer
+from torch.nn import functional as F
 
+class IntentEncoder(nn.Module):
+    def __init__(self, tokenizer, target_size, feat_dim=768):
+        super().__init__()
+        self.tokenizer = tokenizer
+        self.encoder = BertModel.from_pretrained('bert-base-uncased')
+        self.encoder.resize_token_embeddings(len(self.tokenizer)) 
+        self.target_size = target_size
+
+        self.dropout = nn.Dropout(p=0.1)
+        self.head = nn.Linear(feat_dim, 768)
+
+    def forward(self, inputs):
+        out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
+        out2 = self.dropout(out1)
+        return F.normalize(self.head(out2), p=2, dim=-1)
+    
+class IntentClassifier(nn.Module):
+    def __init__(self, args, tokenizer, target_size):
+        super().__init__()
+        input_dim = args.embed_dim
+        self.top = nn.Linear(input_dim, args.hidden_dim)
+        self.relu = nn.ReLU()
+        self.bottom = nn.Linear(args.hidden_dim, target_size)
+        self.encoder = IntentEncoder(tokenizer, target_size)
+
+    def forward(self, inputs):
+        hidden = self.encoder(inputs)
+        middle = self.relu(self.top(hidden))
+        logit = self.bottom(middle)
+        return logit
+    
 
 class Autoencoder(nn.Module):
-    def __init__(self):
+    def __init__(self, tokenizer, target_size):
         super(Autoencoder, self).__init__()
+        self.tokenizer = tokenizer
         self.encoder = BertModel.from_pretrained("bert-base_uncased")
-        # self.decoder = 
+        self.encoder.resize_token_embeddings(len(self.tokenizer))
+        self.head = nn.Linear()
 
-    def forward(self, input_ids):
-        encoding = self.encoder(input_ids=input_ids)
+    def forward(self, inputs):
+        out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
+
+
 
 
 class Autoencoder(nn.Module):
@@ -57,58 +93,3 @@ class Autoencoder(nn.Module):
         
         logits = torch.cat(logits, dim=1)  # Concatenate logits along the sequence length dimension
         return logits
-    
-class IntentModel(nn.Module):
-    def __init__(self, args, tokenizer, target_size):
-        super().__init__()
-        self.tokenizer = tokenizer
-        self.model_setup(args)
-        self.target_size = target_size
-
-        # task1: add necessary class variables as you wish.
-        self.args = args
-        print(self.args)
-
-        # task2: initilize the dropout and classify layers
-        self.dropout = nn.Dropout(self.args.drop_rate)
-        self.classify = Classifier(args,target_size=target_size)
-    
-    def model_setup(self, args):
-        print(f"Setting up {args.model} model")
-
-        # task1: get a pretrained model of 'bert-base-uncased'
-        #self.encoder = BertModel.from_pretrained(...)
-        self.encoder = BertModel.from_pretrained('bert-base-uncased')
-
-        self.encoder.resize_token_embeddings(len(self.tokenizer))  # transformer_check
-        #self.encoder.resize_token_embeddings(len(self.tokenizer)) 
-
-    def forward(self, inputs):
-        """
-        task1: 
-            feeding the input to the encoder, 
-        task2: 
-            take the last_hidden_state's <CLS> token as output of the
-            encoder, feed it to a drop_out layer with the preset dropout rate in the argparse argument, 
-        task3:
-            feed the output of the dropout layer to the Classifier which is provided for you.
-        """
-
-        out1 = self.encoder(**inputs).last_hidden_state[ :, 0 , :]  # (batch_size, seq len, hidden size)
-        # print(out1.size())
-
-        return self.classify(self.dropout(out1))
-
-
-class Classifier(nn.Module):
-    def __init__(self, args, target_size):
-        super().__init__()
-        input_dim = args.embed_dim
-        self.top = nn.Linear(input_dim, args.hidden_dim)
-        self.relu = nn.ReLU()
-        self.bottom = nn.Linear(args.hidden_dim, target_size)
-
-    def forward(self, hidden):
-        middle = self.relu(self.top(hidden))
-        logit = self.bottom(middle)
-        return logit
