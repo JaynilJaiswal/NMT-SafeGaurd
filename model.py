@@ -6,6 +6,16 @@ from transformers import BertModel, BertTokenizer
 class Autoencoder(nn.Module):
     def __init__(self):
         super(Autoencoder, self).__init__()
+        self.encoder = BertModel.from_pretrained("bert-base_uncased")
+        # self.decoder = 
+
+    def forward(self, input_ids):
+        encoding = self.encoder(input_ids=input_ids)
+
+
+class Autoencoder(nn.Module):
+    def __init__(self):
+        super(Autoencoder, self).__init__()
         self.encoder = BertModel.from_pretrained("bert-base-uncased")
         self.decoder_lstm = nn.LSTM(input_size=768, hidden_size=768, num_layers=1, batch_first=True)
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
