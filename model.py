@@ -19,11 +19,11 @@ class Autoencoder(nn.Module):
         encoded_sequence = encoder_output.last_hidden_state
         
         # Decode encoded sequence using LSTM
-        decoded_sequence = self.decode(encoded_sequence)
+        decoded_sequence = self.decode(encoded_sequence, input_ids)
         
         return decoded_sequence
 
-    def decode(self, encoded_sequence):
+    def decode(self, encoded_sequence, target_sequence):
         batch_size, seq_length, hidden_size = encoded_sequence.size()
         decoder_input_ids = torch.full((batch_size, 1), self.tokenizer.cls_token_id, dtype=torch.long, device=encoded_sequence.device)
 
@@ -33,14 +33,16 @@ class Autoencoder(nn.Module):
 
         # Autoregressive decoding using LSTM
         logits = []
+        decoder_input_emb = self.embedding(decoder_input_ids)
         for step in range(seq_length):
-            decoder_input_emb = self.embedding(decoder_input_ids)
             decoder_output, (h_t, c_t) = self.decoder_lstm(decoder_input_emb, (h_0, c_0))
             decoder_output = self.fc(decoder_output)
             logits.append(decoder_output)
-            next_token_logits = decoder_output[:, -1, :]  # logits for the next token
-            next_token_id = next_token_logits.argmax(-1) # get the index of the highest probability token
-            decoder_input_ids = next_token_id.unsqueeze(-1)  # Update input_ids for the next time step
+            # next_token_logits = decoder_output[:, -1, :]  # logits for the next token
+            # next_token_id = next_token_logits.argmax(-1) # get the index of the highest probability token
+            # decoder_input_ids = next_token_id.unsqueeze(-1)  # Update input_ids for the next time step
+            # Use teacher forcing: Use the next token from the target sequence as input to the decoder
+            decoder_input_emb = self.embedding(target_sequence[:, step].unsqueeze(1))  # Get next token embedding      
             # Update hidden state and cell state for next time step
             h_0 = h_t
             c_0 = c_t

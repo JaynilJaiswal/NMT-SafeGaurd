@@ -1,25 +1,17 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
-from transformers import BertTokenizer
 from transformers import AdamW, get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 from model import Autoencoder, IntentModel
 # from utils import WMT14Dataset
 from datasets import load_dataset
 from tqdm import tqdm as progress_bar
 import torch.nn.functional as F
-from utils import set_seed, setup_gpus, check_directories
+from utils import set_seed, setup_gpus, check_directories, WMT14Dataset, BaseInstance
 from dataloader import get_dataloader, check_cache, prepare_features, process_data, prepare_inputs
 from load import load_data, load_tokenizer
 from arguments import params
 
-
-
-# Load data from pickle file
-# with open('all_inputs_250', 'rb') as f:
-#     data = pickle.load(f)
-# Load WMT14 dataset from Hugging Face
-# dataset = load_dataset("wmt14", "de-en")
 
 # Check if GPU is available
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -128,14 +120,34 @@ def baseline_train(args, model, datasets, tokenizer):
         val_acc.append(val_)
     torch.save(model.state_dict(), "text_classifier.pth") # save model
     
+
+def train_autoenc(model, dataloader, optimizer, criterion, device):
+    model.train()
+    total_loss = 0.0
+    pbar = progress_bar(enumerate(dataloader), total=len(dataloader))
+    for step, batch in pbar:
+        # print(batch[1].size())
+        input_ids = batch[0].squeeze().to(device)
+        # attention_mask = input_ids != tokenizer.pad_token_id
+        attention_mask = batch[1].squeeze().to(device)
+        optimizer.zero_grad()
+        # reconstructed_logits = model(input_ids, attention_mask)
+        # print(reconstructed_logits.size(), input_ids.size())
+        # loss = criterion(reconstructed_logits.view(-1, reconstructed_logits.size(-1)), input_ids)
+        # loss.backward()
+        # optimizer.step()
+        # total_loss += loss.item()
+    return total_loss / len(dataloader)
+
+
 # Define training function
-def train(model, intent_classifier, dataloader, optimizer, criterion, adversarial_loss, device):
+def train(model, intent_classifier, dataloader, optimizer, criterion, adversarial_loss, epoch):
     model.train()
     total_loss = 0.0
     # print(len(dataloader))
     pbar = progress_bar(enumerate(dataloader), total=len(dataloader))
     
-    for step, batch in pbar:        
+    for batch_idx, batch in pbar:        
         # print(batch[1].size())
         inputs, labels = prepare_inputs(batch, use_text=False)
         # print(inputs)
@@ -148,18 +160,18 @@ def train(model, intent_classifier, dataloader, optimizer, criterion, adversaria
         decoded_sequences = torch.argmax(logits, dim=-1)  # Shape: (batch_size, sequence_length)
         
         # Pass token IDs to the intent classifier
-        intent_logits = intent_classifier({"input_ids":decoded_sequences*attention_mask, "attention_mask":attention_mask})
+        # intent_logits = intent_classifier({"input_ids":decoded_sequences, "attention_mask":attention_mask})
         
         reconstruction_loss = criterion(logits, input_ids)
         
         # Adversarial loss
-        with torch.no_grad():
-            adversarial_target = torch.argmax(intent_logits, dim=1)  # get the target class
-        adversarial_loss_value = adversarial_loss(intent_logits, adversarial_target)
+        # with torch.no_grad():
+        # adversarial_target = torch.argmax(intent_logits, dim=1)  # get the target class
+        # adversarial_loss_value = adversarial_loss(intent_logits, adversarial_target)
         # print(reconstruction_loss, adversarial_loss_value)
 
         # Total loss
-        loss = reconstruction_loss + 0.1 * adversarial_loss_value.mean()
+        loss = reconstruction_loss #+ 0.0 * adversarial_loss_value.mean()
         
         # print(reconstructed_logits.view(-1, reconstructed_logits.size(-1))[0], input_ids.size())
         # loss = criterion(reconstructed_ids*attention_mask, input_ids)
@@ -167,6 +179,21 @@ def train(model, intent_classifier, dataloader, optimizer, criterion, adversaria
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        if batch_idx == len(dataloader) - 1:  # Check if it's the last batch
+            # Decode logits into tokenized sentences
+            decoded_sequences = torch.argmax(logits, dim=-1)  # Shape: (batch_size, sequence_length)
+            decoded_texts = [tokenizer.decode(seq.tolist(), skip_special_tokens= True) for seq in decoded_sequences]
+            input_texts = [tokenizer.decode(ids.tolist(), skip_special_tokens=True) for ids in input_ids]
+
+            # Write input and output decoded sentences to file for the last batch of the epoch
+            with open("decoded_samples.txt", "a") as f:
+                f.write(f"Epoch: {epoch+1}\n")
+                for i in range(len(input_texts)):
+                    f.write("Input Text:\n")
+                    f.write(input_texts[i] + "\n\n")
+                    f.write("Decoded Output Text:\n")
+                    f.write(decoded_texts[i] + "\n\n")
+                f.write("-------------------------------\n")
         pbar.set_postfix({"Batch Loss": loss.item(),"Total Loss": total_loss/len(dataloader)})
     return total_loss / len(dataloader)
 
@@ -178,28 +205,29 @@ if __name__ == '__main__':
     args = check_directories(args)
     set_seed(args)
     print(args)
-    cache_results, already_exist = check_cache(args)    
+    # cache_results, already_exist = check_cache(args)    
     tokenizer = load_tokenizer(args)
     
-    if already_exist:
-        features = cache_results
-    else:
-        data = load_data()
-        features = prepare_features(args, data, tokenizer, cache_results)
-    datasets = process_data(args, features, tokenizer)
-    for k,v in datasets.items():
-        print(k, len(v))
+    # if already_exist:
+    #     features = cache_results
+    # else:
+    #     data = load_data()
+    #     features = prepare_features(args, data, tokenizer, cache_results)
+    # datasets = process_data(args, features, tokenizer)
+    # for k,v in datasets.items():
+    #     print(k, len(v))
     
-    classifier = IntentModel(args, tokenizer, target_size=60).to(device)
-    classifier_pretrained = load_model(classifier, "text_classifier.pth")
-    if not classifier_pretrained:
-        baseline_train(args, classifier, datasets, tokenizer)    
+    # classifier = IntentModel(args, tokenizer, target_size=60).to(device)
+    autoencoder = Autoencoder()
+    # classifier_pretrained = load_model(classifier, "text_classifier.pth")
+    # generator_pretrained = load_model(autoencoder, "generator.pth")
+    # if not classifier_pretrained:
+    #     baseline_train(args, classifier, datasets, tokenizer)    
     
     
-    dataloader = get_dataloader(args, datasets['train'], split='train')  #/////////// might need to change
+    # dataloader = get_dataloader(args, datasets['train'], split='train')  #/////////// might need to change
 
     # Initialize model, optimizer, and criterion
-    autoencoder = Autoencoder()
     optimizer = torch.optim.Adam(autoencoder.parameters(), lr=1e-4)
     # # criterion = nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
     criterion = SequenceReconstructionLoss(len(tokenizer))
@@ -210,9 +238,26 @@ if __name__ == '__main__':
 
     # Move model to device
     autoencoder.to(device)
+    
+    # with open("all_inputs_100","rb") as f:
+    #     data = pickle.load(f)
+    # Initialize dataset and dataloader
+    wmt14_dataset = WMT14Dataset("all_inputs_100", tokenizer=tokenizer)
+    dataloader = DataLoader(wmt14_dataset, batch_size=16, shuffle=True, collate_fn=wmt14_dataset.collate_fn)
+    # print(len(wmt14_dataset))
 
     # Training loop
-    num_epochs = 10
+    num_epochs = 1
     for epoch in range(num_epochs):
-        loss = train(autoencoder, classifier, dataloader, optimizer, criterion, adversarial_loss, device)
+        loss = train_autoenc(autoencoder, dataloader, optimizer, criterion, device)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
+
+
+
+    # # Training loop
+    # num_epochs = 50
+    # for epoch in range(num_epochs):
+    #     loss = train(autoencoder, classifier, dataloader, optimizer, criterion, adversarial_loss, epoch)
+    #     print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
+    #     if epoch%2==0:
+    #         torch.save(autoencoder.state_dict(), "generator.pth") # save model

@@ -42,7 +42,7 @@ def params():
                 help="Whether to run eval on the dev set.")
     
     # Hyper-parameters for tuning
-    parser.add_argument("--batch-size", default=16, type=int,
+    parser.add_argument("--batch-size", default=8, type=int,
                 help="Batch size per GPU/CPU for training and evaluation.")
     parser.add_argument("--learning-rate", default=1e-3, type=float,
                 help="Model learning rate starting point.")
