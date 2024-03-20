@@ -13,10 +13,11 @@ class IntentEncoder(nn.Module):
         self.dropout = nn.Dropout(args.drop_rate)
         self.head = nn.Linear(feat_dim, args.embed_dim)
 
-    def forward(self, inputs):
+    def forward(self, inputs, dropout=True):
         out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
-        out2 = self.dropout(out1)
-        return F.normalize(self.head(out2), p=2, dim=-1)
+        if dropout:
+            out1 = self.dropout(out1)
+        return F.normalize(self.head(out1), p=2, dim=-1)
     
 class IntentClassifier(nn.Module):
     def __init__(self, args, intent_encoder, target_size=60):
@@ -44,8 +45,9 @@ class Generator(nn.Module):
         self.decoder = nn.Linear(feat_dim, self.encoder.config.vocab_size)
 
     def forward(self, inputs):
+        masks = inputs['attention_mask']
         out1 = self.encoder(**inputs).last_hidden_state
-        return self.decoder(out1)
+        return self.decoder(out1), masks
 
 
 

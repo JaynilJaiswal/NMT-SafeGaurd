@@ -170,7 +170,7 @@ def train(args, model, datasets):
         run_eval(args=args, model=model, datasets=datasets)
         print('Classification epoch', epoch_count, '| losses:', losses)
 
-def train_generator(args, generator, classifier, tokenizer, datasets):
+def train_generator(args, generator, classifier, encoder, tokenizer, datasets):
     criterion = AdversarialLoss()
     train_dataloader = get_dataloader(args, datasets['train'], split='train')
     gen_optimizer = AdamW(generator.encoder.parameters(), lr=1e-5)
@@ -178,6 +178,7 @@ def train_generator(args, generator, classifier, tokenizer, datasets):
 
     generator.train()
     classifier.eval()
+    encoder.eval()
 
     for epoch_count in range(args.n_epochs):
         losses = 0
@@ -185,40 +186,29 @@ def train_generator(args, generator, classifier, tokenizer, datasets):
         for step, batch in pb:
             generator.zero_grad()
 
-            inputs, labels, label_texts = prepare_inputs(batch, use_text=True)
-            generated_text = tokenizer.batch_decode(torch.argmax(generator(inputs), dim=-1), skip_special_tokens=True)
+            inputs, labels = prepare_inputs(batch)
+            generated_inputs, masks = generator(inputs)
 
-            examples = []
-            for i in range(len(generated_text)):
-                examples.append({
-                    'text': generated_text[i],
-                    'label': labels[i].item(),
-                    'label_text': label_texts[i]
-                })
-            data = {'generated': examples}
-            feats = prepare_features(args, data, tokenizer, '', False)
-            print(feats)
+            generated_inputs = torch.argmax(generated_inputs, dim=-1)
+            for i in range(len(generated_inputs)): # apply mask to generated input
+                generated_inputs[i, masks[i] == 0] = 0
+            
+            generated_inputs = {
+                'input_ids': generated_inputs,
+                'token_type_ids': torch.zeros_like(generated_inputs),
+                'attention_mask': masks
+            }
+            
+            # print(tokenizer.batch_decode(generated_inputs['input_ids'], skip_special_tokens=True)) # print out sentences
 
+            orig_embed = encoder(inputs, dropout=False)
+            generated_embed = encoder(generated_inputs, dropout=False)
 
-    # for split, examples in data.items():
-    #     feats = []
-    #     for example in progress_bar(examples, total=len(examples)):
-    #         # tokenizer: set padding to 'max_length', set truncation to True, set max_length to args.max_len
-    #         embed_data = tokenizer(example['text'], padding='max_length', truncation=True, max_length=args.max_len) 
-    #         feats.append(BaseInstance(embed_data, example))
-    #     all_features[split] = feats
-    #     print(f'Number of {split} features:', len(feats))
-
-    # pkl.dump(all_features, open(cache_path, 'wb'))
-    # return all_features
-
-            print(generated_text)
-
-            cosine_similarity = F.cosine_similarity(generated_inputs, inputs, dim=1).mean() # Cosine similarity loss
-            adversarial_loss = criterion(classifier(generated_inputs), labels)              # Adversarial loss from classifier
+            cosine_similarity = F.cosine_similarity(orig_embed, generated_embed, dim=1).mean()  # Cosine similarity loss
+            adversarial_loss = criterion(classifier(generated_inputs), labels)                  # Adversarial loss from classifier
 
             # Total generator loss
-            generator_loss = (1-cosine_similarity) + 0.1*torch.mean(adversarial_loss)
+            generator_loss = (1-cosine_similarity) + 0.01*torch.mean(adversarial_loss)
             generator_loss.backward()
             gen_optimizer.step()
 

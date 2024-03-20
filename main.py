@@ -63,7 +63,7 @@ intent_generator_trained = load_model(intent_generator, 'intent-generator.pth')
 intent_generator.to(device)
 
 if not intent_generator_trained:
-    train_generator(args, intent_generator, intent_classifier, tokenizer, datasets)
+    train_generator(args, intent_generator, intent_classifier, intent_encoder, tokenizer, datasets)
     torch.save(intent_generator.state_dict(), 'intent-generator.pth')
 
 
