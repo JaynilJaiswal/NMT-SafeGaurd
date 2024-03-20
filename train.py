@@ -100,6 +100,7 @@ class AdversarialLoss(nn.Module):
         super(AdversarialLoss, self).__init__()
 
     def forward(self, pred, target):
+        pred = torch.sigmoid(pred)
         logs = torch.log(pred)
         for i in range(target.shape[0]):
             logs[i, target[i].item()] = 0
@@ -211,6 +212,7 @@ def train_generator(args, generator, classifier, encoder, tokenizer, datasets):
             generator_loss = (1-cosine_similarity) + 0.01*torch.mean(adversarial_loss)
             generator_loss.backward()
             gen_optimizer.step()
+
 
             losses += generator_loss.item()
             pb.set_postfix({'Generator Loss': losses / len(train_dataloader)})
