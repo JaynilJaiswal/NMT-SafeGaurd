@@ -87,31 +87,15 @@ def test( model, device, test_loader, epsilon ):
         perturbed_data_normalized = transforms.Normalize((0.1307,), (0.3081,))(perturbed_data).to(device)
 
         # Re-classify the perturbed image
-        # output = model(perturbed_data_normalized)
         output = model(perturbed_data_normalized.view(-1, 28 * 28))
         # Check for success
-        # final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-        # _, final_pred = torch.max(output.data, 1)
         final_pred = output.max(1, keepdim=True)[1]
-        # print(final_pred)
-        # if final_pred.item() == target.item():
-        #     correct += 1
-        #     # Special case for saving 0 epsilon examples
-        #     if epsilon == 0 and len(adv_examples) < 5:
-        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
         if final_pred.item() == target.item():
             correct += 1
             # Special case for saving 0 epsilon examples
             if epsilon == 0 and len(adv_examples) < 5:
                 adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
                 adv_examples.append((init_pred.item(), final_pred.item(), adv_ex))
-        # else:
-        #     # Save some adv examples for visualization later
-        #     if len(adv_examples) < 5:
-        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) 
-        # )
         else:
             # Save some adv examples for visualization later
             if len(adv_examples) < 5:
@@ -156,8 +140,8 @@ if __name__ == "__main__":
         examples.append(ex)
 
     # Plot several examples of adversarial samples at each epsilon
-    # Plot several examples of adversarial samples at each epsilon
     cnt = 0
+    # Save the figure
     plt.figure(figsize=(8,10))
     for i in range(len(epsilons)):
         for j in range(len(examples[i])):
@@ -169,6 +153,9 @@ if __name__ == "__main__":
                 plt.ylabel(f"Eps: {epsilons[i]}", fontsize=14)
             orig, adv, ex = examples[i][j]
             plt.title(f"{orig} -> {adv}")
-            plt.imshow(ex.reshape(28, 28), cmap="gray")  # Reshape the data for display
+            plt.imshow(ex.reshape(28, 28), cmap="gray")
     plt.tight_layout()
+
+    # Save the plot to a file
+    plt.savefig('adversarial_examples.png')
     plt.show()
