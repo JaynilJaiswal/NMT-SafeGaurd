@@ -66,7 +66,35 @@ if not intent_generator_trained:
     train_generator(args, intent_generator, intent_classifier, intent_encoder, tokenizer, datasets)
     torch.save(intent_generator.state_dict(), 'intent-generator.pth')
 
+#################### TEST GENERATOR ####################
+intent_generator.eval()
+intent_classifier.eval()
+intent_encoder.eval()
+dataloader = get_dataloader(args, datasets['test'], 'test')
+orig_acc = 0
+adversarial_acc = 0
+for step, batch in progress_bar(enumerate(dataloader), total=len(dataloader)):
+    inputs, labels = prepare_inputs(batch)
+    generated_inputs, masks = intent_generator(inputs)
+    generated_inputs = torch.argmax(generated_inputs, dim=-1)
+    for i in range(len(generated_inputs)): # apply mask to generated input
+        generated_inputs[i, masks[i] == 0] = 0
+    generated_inputs = {
+        'input_ids': generated_inputs,
+        'token_type_ids': torch.zeros_like(generated_inputs),
+        'attention_mask': masks
+    }
+    adversarial_logits = intent_classifier(generated_inputs)
+    adversarial_acc += (adversarial_logits.argmax(1) == labels).float().sum().item()
+    
+    orig_logits = intent_classifier(inputs)
+    orig_acc += (orig_logits.argmax(1) == labels).float().sum().item()
 
+    if step % 500 == 0:
+        print(tokenizer.batch_decode(generated_inputs['input_ids'], skip_special_tokens=True)) # print out sentences
+adversarial_acc = adversarial_acc / len(datasets['test'])
+orig_acc = orig_acc / len(datasets['test'])
+print(f'{adversarial_acc} vs {orig_acc}')
 
         
 # class SequenceReconstructionLoss(nn.Module):

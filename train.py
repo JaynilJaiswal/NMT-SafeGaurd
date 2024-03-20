@@ -213,7 +213,6 @@ def train_generator(args, generator, classifier, encoder, tokenizer, datasets):
             generator_loss.backward()
             gen_optimizer.step()
 
-
             losses += generator_loss.item()
             pb.set_postfix({'Generator Loss': losses / len(train_dataloader)})
         gen_scheduler.step()  # Update learning rate schedule
