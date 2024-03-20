@@ -7,43 +7,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
-
-
-#################### DEFINE MODELS AND CUSTOM LOSS ####################
-class Generator(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(Generator, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, 784)  # Output size is the same as input size (MNIST images)
-        self.activation = nn.Tanh()
-
-    def forward(self, x):
-        x = self.activation(self.fc1(x))
-        x = self.fc2(x)
-        return x
-    
-class DigitClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size):
-        super(DigitClassifier, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, 10)  # Output size is 10 for 10 classes (digits)
-        self.activation = nn.Softmax(dim=1)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = self.fc2(x)
-        x = self.activation(x)
-        return x
-    
-class AdversarialLoss(nn.Module):
-    def __init__(self):
-        super(AdversarialLoss, self).__init__()
-
-    def forward(self, pred, target):
-        logs = torch.log(pred)
-        for i in range(target.shape[0]):
-            logs[i, target[i].item()] = 0
-        return -torch.sum(logs, dim=1) / (pred.shape[1])
+from model import Generator, DigitClassifier
+from loss import AdversarialLoss
+from utils import load_model, plot_images
     
 
 #################### LOAD DATASET ####################
@@ -59,35 +25,12 @@ data_loader = DataLoader(mnist_dataset, batch_size=128, shuffle=True)
 generator = Generator(input_size=784, hidden_size=256)
 classifier = DigitClassifier(input_size=784, hidden_size=256)
 
-def load_model(model, model_name):
-    '''Check if pre-trained models exist and load them'''
-    try:
-        model.load_state_dict(torch.load(model_name))
-        print(f"Pre-trained model '{model_name}' loaded successfully.")
-        return True
-    except FileNotFoundError:
-        print(f"No pre-trained model found. Training from scratch.")
-        return False
-
 generator_trained = load_model(generator, 'generator.pth')
 classifier_trained = load_model(classifier, 'classifier.pth')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 generator.to(device)
 classifier.to(device)
-
-
-#################### PLOT IMAGE FUNCTION ####################
-def plot_images(real_images, generated_images, epoch):
-    fig, axes = plt.subplots(nrows=2, ncols=10, figsize=(20, 4))
-    for ax, image in zip(axes[0], real_images):
-        ax.imshow(image.view(28, 28).cpu().detach().numpy(), cmap='gray')
-        ax.axis('off')
-    for ax, image in zip(axes[1], generated_images):
-        ax.imshow(image.view(28, 28).cpu().detach().numpy(), cmap='gray')
-        ax.axis('off')
-    plt.savefig(f'comparison_epoch_{epoch}.png')
-    plt.close()
 
 
 ################### TRAIN CLASSIFIER IF NOT LOADED ####################

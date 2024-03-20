@@ -2,9 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import torchvision
 from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
+from utils import load_model
+from model import DigitClassifier
 
 # FGSM attack code
 def fgsm_attack(image, epsilon, data_grad):
@@ -48,6 +52,7 @@ def test( model, device, test_loader, epsilon ):
 
         # Send the data and label to the device
         data, target = data.to(device), target.to(device)
+        data = data.view(-1, 28*28) 
 
         # Set requires_grad attribute of tensor. Important for Attack
         data.requires_grad = True
@@ -79,24 +84,39 @@ def test( model, device, test_loader, epsilon ):
         perturbed_data = fgsm_attack(data_denorm, epsilon, data_grad)
 
         # Reapply normalization
-        perturbed_data_normalized = transforms.Normalize((0.1307,), (0.3081,))(perturbed_data)
+        perturbed_data_normalized = transforms.Normalize((0.1307,), (0.3081,))(perturbed_data).to(device)
 
         # Re-classify the perturbed image
-        output = model(perturbed_data_normalized)
-
+        # output = model(perturbed_data_normalized)
+        output = model(perturbed_data_normalized.view(-1, 28 * 28))
         # Check for success
-        final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        # final_pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
+        # _, final_pred = torch.max(output.data, 1)
+        final_pred = output.max(1, keepdim=True)[1]
+        # print(final_pred)
+        # if final_pred.item() == target.item():
+        #     correct += 1
+        #     # Special case for saving 0 epsilon examples
+        #     if epsilon == 0 and len(adv_examples) < 5:
+        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
+        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
         if final_pred.item() == target.item():
             correct += 1
             # Special case for saving 0 epsilon examples
             if epsilon == 0 and len(adv_examples) < 5:
                 adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+                adv_examples.append((init_pred.item(), final_pred.item(), adv_ex))
+        # else:
+        #     # Save some adv examples for visualization later
+        #     if len(adv_examples) < 5:
+        #         adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
+        #         adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) 
+        # )
         else:
             # Save some adv examples for visualization later
             if len(adv_examples) < 5:
                 adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
-                adv_examples.append( (init_pred.item(), final_pred.item(), adv_ex) )
+                adv_examples.append((init_pred.item(), final_pred.item(), adv_ex))
 
     # Calculate final accuracy for this epsilon
     final_acc = correct/float(len(test_loader))
@@ -108,20 +128,34 @@ def test( model, device, test_loader, epsilon ):
 if __name__ == "__main__":
 
     epsilons = [0, .05, .1, .15, .2, .25, .3]
-    pretrained_model = "data/lenet_mnist_model.pth"
+    classifier = DigitClassifier(input_size=784, hidden_size=256)
+    load_model(classifier, 'classifier.pth')
+    # classifier.to(device)
     use_cuda=True
     # Set random seed for reproducibility
     torch.manual_seed(42)
+    device = torch.device("cuda" if use_cuda and torch.cuda.is_available() else "cpu")
+    classifier.to(device)
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
+    # Load MNIST test dataset
+    mnist_test_dataset = torchvision.datasets.MNIST(root='./data', train=False, transform=transform, download=True)
+
+    # Define DataLoader for the test dataset
+    test_loader = DataLoader(mnist_test_dataset, batch_size=1, shuffle=False)
 
     accuracies = []
     examples = []
 
     # Run test for each epsilon
     for eps in epsilons:
-        acc, ex = test(model, device, test_loader, eps)
+        acc, ex = test(classifier, device, test_loader, eps)
         accuracies.append(acc)
         examples.append(ex)
 
+    # Plot several examples of adversarial samples at each epsilon
     # Plot several examples of adversarial samples at each epsilon
     cnt = 0
     plt.figure(figsize=(8,10))
@@ -133,11 +167,8 @@ if __name__ == "__main__":
             plt.yticks([], [])
             if j == 0:
                 plt.ylabel(f"Eps: {epsilons[i]}", fontsize=14)
-            orig,adv,ex = examples[i][j]
+            orig, adv, ex = examples[i][j]
             plt.title(f"{orig} -> {adv}")
-            plt.imshow(ex, cmap="gray")
+            plt.imshow(ex.reshape(28, 28), cmap="gray")  # Reshape the data for display
     plt.tight_layout()
     plt.show()
-
-
-

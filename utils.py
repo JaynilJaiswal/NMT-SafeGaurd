@@ -39,3 +39,25 @@ class WMT14Dataset(Dataset):
     def load_data(self, data_file):
         # Implement loading and preprocessing of data from the file
         pass
+
+
+def load_model(model, model_name):
+    '''Check if pre-trained models exist and load them'''
+    try:
+        model.load_state_dict(torch.load(model_name))
+        print(f"Pre-trained model '{model_name}' loaded successfully.")
+        return True
+    except FileNotFoundError:
+        print(f"No pre-trained model found. Training from scratch.")
+        return False
+
+def plot_images(real_images, generated_images, epoch):
+    fig, axes = plt.subplots(nrows=2, ncols=10, figsize=(20, 4))
+    for ax, image in zip(axes[0], real_images):
+        ax.imshow(image.view(28, 28).cpu().detach().numpy(), cmap='gray')
+        ax.axis('off')
+    for ax, image in zip(axes[1], generated_images):
+        ax.imshow(image.view(28, 28).cpu().detach().numpy(), cmap='gray')
+        ax.axis('off')
+    plt.savefig(f'comparison_epoch_{epoch}.png')
+    plt.close()

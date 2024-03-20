@@ -39,3 +39,30 @@ class Autoencoder(nn.Module):
             decoder_input_ids = torch.cat([decoder_input_ids, next_token_id.unsqueeze(-1)], dim=-1)
         
         return decoder_input_ids[:, 1:]  # remove the initial padding token
+
+#################### DEFINE MODELS AND CUSTOM LOSS ####################
+class Generator(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(Generator, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, 784)  # Output size is the same as input size (MNIST images)
+        self.activation = nn.Tanh()
+
+    def forward(self, x):
+        x = self.activation(self.fc1(x))
+        x = self.fc2(x)
+        return x
+    
+class DigitClassifier(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(DigitClassifier, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, 10)  # Output size is 10 for 10 classes (digits)
+        self.activation = nn.Softmax(dim=1)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = self.fc2(x)
+        x = self.activation(x)
+        return x
+    
