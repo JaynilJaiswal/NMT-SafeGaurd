@@ -41,11 +41,11 @@ class Generator(nn.Module):
         self.encoder = BertModel.from_pretrained("bert-base-uncased")
         self.encoder.resize_token_embeddings(len(self.tokenizer))
         self.target_size = target_size
-        self.head = nn.Linear(feat_dim, args.embed_dim)
+        self.decoder = nn.Linear(feat_dim, self.encoder.config.vocab_size)
 
     def forward(self, inputs):
-        out1 = self.encoder(**inputs).last_hidden_state[:, 0, :]
-        return self.head(out1)
+        out1 = self.encoder(**inputs).last_hidden_state
+        return self.decoder(out1)
 
 
 

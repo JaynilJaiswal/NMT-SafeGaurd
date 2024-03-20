@@ -46,7 +46,7 @@ def check_cache(args):
         print(f'Creating new input features ...')
         return cache_path, False
 
-def prepare_features(args, data, tokenizer, cache_path):
+def prepare_features(args, data, tokenizer, cache_path, save=True):
     all_features = {}
 
     for split, examples in data.items():
@@ -58,7 +58,8 @@ def prepare_features(args, data, tokenizer, cache_path):
         all_features[split] = feats
         print(f'Number of {split} features:', len(feats))
 
-    pkl.dump(all_features, open(cache_path, 'wb'))
+    if save:
+        pkl.dump(all_features, open(cache_path, 'wb'))
     return all_features
 
 def process_data(args, features, tokenizer):

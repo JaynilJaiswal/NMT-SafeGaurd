@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from transformers import AdamW, get_linear_schedule_with_warmup
 from tqdm import tqdm as progress_bar
 
-from dataloader import get_dataloader, prepare_inputs
+from dataloader import get_dataloader, prepare_inputs, prepare_features
 
 
 class Loss(nn.Module):
@@ -170,7 +170,7 @@ def train(args, model, datasets):
         run_eval(args=args, model=model, datasets=datasets)
         print('Classification epoch', epoch_count, '| losses:', losses)
 
-def train_generator(args, generator, classifier, datasets):
+def train_generator(args, generator, classifier, tokenizer, datasets):
     criterion = AdversarialLoss()
     train_dataloader = get_dataloader(args, datasets['train'], split='train')
     gen_optimizer = AdamW(generator.encoder.parameters(), lr=1e-5)
@@ -185,8 +185,34 @@ def train_generator(args, generator, classifier, datasets):
         for step, batch in pb:
             generator.zero_grad()
 
-            inputs, labels = prepare_inputs(batch)
-            generated_inputs = generator(inputs)
+            inputs, labels, label_texts = prepare_inputs(batch, use_text=True)
+            generated_text = tokenizer.batch_decode(torch.argmax(generator(inputs), dim=-1), skip_special_tokens=True)
+
+            examples = []
+            for i in range(len(generated_text)):
+                examples.append({
+                    'text': generated_text[i],
+                    'label': labels[i].item(),
+                    'label_text': label_texts[i]
+                })
+            data = {'generated': examples}
+            feats = prepare_features(args, data, tokenizer, '', False)
+            print(feats)
+
+
+    # for split, examples in data.items():
+    #     feats = []
+    #     for example in progress_bar(examples, total=len(examples)):
+    #         # tokenizer: set padding to 'max_length', set truncation to True, set max_length to args.max_len
+    #         embed_data = tokenizer(example['text'], padding='max_length', truncation=True, max_length=args.max_len) 
+    #         feats.append(BaseInstance(embed_data, example))
+    #     all_features[split] = feats
+    #     print(f'Number of {split} features:', len(feats))
+
+    # pkl.dump(all_features, open(cache_path, 'wb'))
+    # return all_features
+
+            print(generated_text)
 
             cosine_similarity = F.cosine_similarity(generated_inputs, inputs, dim=1).mean() # Cosine similarity loss
             adversarial_loss = criterion(classifier(generated_inputs), labels)              # Adversarial loss from classifier

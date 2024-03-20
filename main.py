@@ -41,7 +41,7 @@ intent_classifier = IntentClassifier(args, intent_encoder=intent_encoder)
 def load_model(model, model_name):
     '''Check if pre-trained models exist and load them'''
     try:
-        model.load_state_dict(torch.load(model_name))
+        model.load_state_dict(torch.load(model_name, map_location=torch.device(device)))
         print(f"Pre-trained model '{model_name}' loaded successfully.")
         return True
     except FileNotFoundError:
@@ -63,7 +63,7 @@ intent_generator_trained = load_model(intent_generator, 'intent-generator.pth')
 intent_generator.to(device)
 
 if not intent_generator_trained:
-    train_generator(args, intent_generator, intent_classifier, datasets)
+    train_generator(args, intent_generator, intent_classifier, tokenizer, datasets)
     torch.save(intent_generator.state_dict(), 'intent-generator.pth')
 
 
