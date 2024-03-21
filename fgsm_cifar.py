@@ -21,24 +21,11 @@ def fgsm_attack(image, epsilon, data_grad):
     # Return the perturbed image
     return perturbed_image
 
-# restores the tensors to their original scale
-def denorm(batch, mean=[0.1307], std=[0.3081]):
-    """
-    Convert a batch of tensors to their original scale.
-
-    Args:
-        batch (torch.Tensor): Batch of normalized tensors.
-        mean (torch.Tensor or list): Mean used for normalization.
-        std (torch.Tensor or list): Standard deviation used for normalization.
-
-    Returns:
-        torch.Tensor: batch of tensors without normalization applied to them.
-    """
-    if isinstance(mean, list):
-        mean = torch.tensor(mean).to(device)
-    if isinstance(std, list):
-        std = torch.tensor(std).to(device)
-
+def denorm(batch):
+    mean = [0.5, 0.5, 0.5]
+    std = [0.5, 0.5, 0.5]
+    mean = torch.tensor(mean).to(device)
+    std = torch.tensor(std).to(device)
     return batch * std.view(1, -1, 1, 1) + mean.view(1, -1, 1, 1)
 
 def test( model, device, test_loader, epsilon ):
