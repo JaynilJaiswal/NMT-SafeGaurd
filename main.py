@@ -215,6 +215,57 @@ def train(model, intent_classifier, dataloader, optimizer, criterion, adversaria
     return total_loss / len(dataloader)
 
 
+# Define test function
+def test(args, model, datasets, intent_classifier):
+    dataloader = get_dataloader(args, datasets['test'], split='test')
+    model.eval()
+    intent_classifier.eval()
+    # print(len(dataloader))
+    pbar = progress_bar(enumerate(dataloader), total=len(dataloader))
+    acc = 0
+    losses = 0 
+    for batch_idx, batch in pbar:        
+        # print(batch[1].size())
+        inputs, labels = prepare_inputs(batch, use_text=False)
+        # print(inputs)
+        input_ids = inputs['input_ids']
+        attention_mask = inputs['attention_mask']
+        optimizer.zero_grad()
+        logits = model(input_ids, attention_mask)
+        
+        # Extract token IDs from logits
+        decoded_sequences = torch.argmax(logits, dim=-1)  # Shape: (batch_size, sequence_length)
+        
+        # Pass token IDs to the intent classifier
+        intent_logits = intent_classifier({"input_ids":decoded_sequences, "attention_mask":attention_mask})
+
+        criterian = nn.CrossEntropyLoss()
+        loss = criterian(intent_logits, labels)
+        losses += loss.item()
+
+        tem = (intent_logits.argmax(1) == labels).float().sum()
+        acc += tem.item()
+
+        if batch_idx >= len(dataloader) - 2:  # Check if it's the last batch
+            # Decode logits into tokenized sentences
+            decoded_sequences = torch.argmax(logits, dim=-1)  # Shape: (batch_size, sequence_length)
+            decoded_texts = [tokenizer.decode(seq.tolist(), skip_special_tokens= True) for seq in decoded_sequences]
+            input_texts = [tokenizer.decode(ids.tolist(), skip_special_tokens=True) for ids in input_ids]
+
+            # Write input and output decoded sentences to file for the last batch of the epoch
+            with open("decoded_test_samples.txt", "a") as f:
+                # f.write(f"Epoch: {epoch+1}\n")
+                for i in range(len(input_texts)):
+                    f.write("Input Text:\n")
+                    f.write(input_texts[i] + "\n\n")
+                    f.write("Decoded Output Text:\n")
+                    f.write(decoded_texts[i] + "\n\n")
+                f.write("-------------------------------\n")
+        pbar.set_postfix({"Batch Loss": loss.item(),"Total Loss": losses/len(dataloader)})
+        
+    print('test acc:', acc/len(datasets['test']*100), f'| {losses} loss ', f'|dataset split test size:', len(datasets['test']))
+    return acc / len(dataloader)
+
 if __name__ == '__main__':
     
     args = params()
@@ -264,6 +315,9 @@ if __name__ == '__main__':
     # print(len(wmt14_dataset))
 
     # Training loop
+    
+    
+    # if not generator_pretrained:
     num_epochs = 0
     for epoch in range(num_epochs):
         loss = train_autoenc(autoencoder, dataloader, optimizer, criterion, device)
@@ -273,9 +327,12 @@ if __name__ == '__main__':
 
 
     # Training loop
-    num_epochs = 50
+    num_epochs = 35
     for epoch in range(num_epochs):
         loss = train(autoencoder, classifier, dataloader, optimizer, criterion, adversarial_loss, epoch)
         print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {loss:.4f}")
         if epoch%2==0:
             torch.save(autoencoder.state_dict(), "generator.pth") # save model
+                
+    test(args, autoencoder, datasets, classifier)
+                
