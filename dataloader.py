@@ -70,27 +70,6 @@ def prepare_features(args, data, tokenizer, cache_path):
     pkl.dump(all_features, open(cache_path, 'wb'))
     return all_features
 
-def prepare_features_wmt14(args, data, tokenizer, cache_path):
-    all_features = {}
-
-    for split, examples in data.items():
-        
-        feats = []
-        # task1: process examples using tokenizer. Wrap it using BaseInstance class and append it to feats list.
-        for example in progress_bar(examples, total=len(examples)):
-            # tokenizer: set padding to 'max_length', set truncation to True, set max_length to args.max_len
-            #embed_data = tokenizer(...)
-            embed_data = tokenizer(example['text'], padding='max_length', truncation=True, max_length=args.max_len) 
-
-            instance = BaseIntentInstance(embed_data, example)
-            feats.append(instance)
-        # print(embed_data, example)
-        all_features[split] = feats
-        print(f'Number of {split} features:', len(feats))
-
-    pkl.dump(all_features, open(cache_path, 'wb'))
-    return all_features
-
 def process_data(args, features, tokenizer):
   train_size, dev_size = len(features['train']), len(features['validation'])
 

@@ -56,7 +56,7 @@ def params():
                 help="Epsilon for Adam optimizer.")
     parser.add_argument("--n-epochs", default=10, type=int,
                 help="Total number of training epochs to perform.")
-    parser.add_argument("--max-len", default=20, type=int,
+    parser.add_argument("--max-len", default=10, type=int,
                 help="maximum sequence length to look back")
 
     args = parser.parse_args()
