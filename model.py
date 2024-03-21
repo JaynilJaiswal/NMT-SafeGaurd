@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from transformers import BertModel, BertTokenizer
+import torch.nn.functional as F
 
 
 class Autoencoder(nn.Module):

@@ -52,7 +52,6 @@ def test( model, device, test_loader, epsilon ):
 
         # Send the data and label to the device
         data, target = data.to(device), target.to(device)
-        data = data.view(-1, 28*28) 
 
         # Set requires_grad attribute of tensor. Important for Attack
         data.requires_grad = True
@@ -87,7 +86,7 @@ def test( model, device, test_loader, epsilon ):
         perturbed_data_normalized = transforms.Normalize((0.1307,), (0.3081,))(perturbed_data).to(device)
 
         # Re-classify the perturbed image
-        output = model(perturbed_data_normalized.view(-1, 28 * 28))
+        output = model(perturbed_data_normalized)
         # Check for success
         final_pred = output.max(1, keepdim=True)[1]
         if final_pred.item() == target.item():
@@ -113,8 +112,7 @@ if __name__ == "__main__":
 
     epsilons = [0, .05, .1, .15, .2, .25, .3]
     classifier = CifarClassifier()
-    load_model(classifier, 'classifier.pth')
-    # classifier.to(device)
+    load_model(classifier, 'classifier_cifar.pth')
     use_cuda=True
     # Set random seed for reproducibility
     torch.manual_seed(42)
@@ -124,11 +122,24 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
     ])
-    # Load MNIST test dataset
+    # Load CIFAR test dataset
     cifar_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
 
     # Define DataLoader for the test dataset
     test_loader = DataLoader(cifar_dataset, batch_size=1, shuffle=False)
+
+    class_labels = {
+        0: 'airplane',
+        1: 'automobile',
+        2: 'bird',
+        3: 'cat',
+        4: 'deer',
+        5: 'dog',
+        6: 'frog',
+        7: 'horse',
+        8: 'ship',
+        9: 'truck',
+    }
 
     accuracies = []
     examples = []
@@ -152,8 +163,10 @@ if __name__ == "__main__":
             if j == 0:
                 plt.ylabel(f"Eps: {epsilons[i]}", fontsize=14)
             orig, adv, ex = examples[i][j]
-            plt.title(f"{orig} -> {adv}")
-            plt.imshow(ex.reshape(28, 28), cmap="gray")
+            # plt.title(f"{orig} -> {adv}")
+            plt.title(f"{class_labels[orig]} -> {class_labels[adv]}") 
+            ex_image = ex.reshape(3, 32, 32).transpose(1, 2, 0)
+            plt.imshow(ex_image)
     plt.tight_layout()
 
     # Save the plot to a file

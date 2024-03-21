@@ -168,7 +168,6 @@ if not classifier_trained:
         total_predictions = 0
 
         for images, labels in tqdm(data_loader, desc=f"Epoch {epoch + 1}/{num_epochs}"):
-            # images = images.view(-1, 3072).to(device)
             images = images.to(device)
             labels = labels.to(device)
 
