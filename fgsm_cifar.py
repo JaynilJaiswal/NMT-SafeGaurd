@@ -79,12 +79,12 @@ def test( model, device, test_loader, epsilon ):
         if final_pred.item() == target.item():
             correct += 1
             # Special case for saving 0 epsilon examples
-            if epsilon == 0 and len(adv_examples) < 5:
+            if epsilon == 0 and len(adv_examples) < 10:
                 adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
                 adv_examples.append((init_pred.item(), final_pred.item(), adv_ex))
         else:
             # Save some adv examples for visualization later
-            if len(adv_examples) < 5:
+            if len(adv_examples) < 10:
                 adv_ex = perturbed_data.squeeze().detach().cpu().numpy()
                 adv_examples.append((init_pred.item(), final_pred.item(), adv_ex))
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         transforms.Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))
     ])
     # Load CIFAR test dataset
-    cifar_dataset = torchvision.datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
+    cifar_dataset = torchvision.datasets.CIFAR10(root='./data', train=False, transform=transform, download=True)
 
     # Define DataLoader for the test dataset
     test_loader = DataLoader(cifar_dataset, batch_size=1, shuffle=False)

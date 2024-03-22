@@ -12,17 +12,6 @@ from model import CifarClassifier
 
 
 #################### DEFINE MODELS AND CUSTOM LOSS ####################
-# class Generator(nn.Module):
-#     def __init__(self, input_size, hidden_size):
-#         super(Generator, self).__init__()
-#         self.fc1 = nn.Linear(input_size, hidden_size)
-#         self.fc2 = nn.Linear(hidden_size, 3072)  # Output size is the same as input size (MNIST images)
-#         self.activation = nn.Tanh()
-
-#     def forward(self, x):
-#         x = self.activation(self.fc1(x))
-#         x = self.fc2(x)
-#         return x
 
 class Generator(nn.Module):
     def __init__(self, channels_img=3, features_g=64):
@@ -76,25 +65,6 @@ class Generator(nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
-    
-# class CifarClassifier(nn.Module):
-#     def __init__(self):
-#         super(CifarClassifier, self).__init__()
-#         self.conv1 = nn.Conv2d(3, 32, 3, padding=1)
-#         self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
-#         self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
-#         self.pool = nn.MaxPool2d(2, 2)
-#         self.fc1 = nn.Linear(128 * 4 * 4, 512)
-#         self.fc2 = nn.Linear(512, 10) 
-
-#     def forward(self, x):
-#         x = self.pool(F.relu(self.conv1(x)))
-#         x = self.pool(F.relu(self.conv2(x)))
-#         x = self.pool(F.relu(self.conv3(x)))
-#         x = x.view(-1, 128 * 4 * 4)
-#         x = F.relu(self.fc1(x))
-#         x = self.fc2(x)
-#         return x
 
 class AdversarialLoss(nn.Module):
     def __init__(self):
