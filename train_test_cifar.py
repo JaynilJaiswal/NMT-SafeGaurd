@@ -173,6 +173,7 @@ if not generator_trained:
         gen_loss_sum = 0.0
         disc_loss_sum = 0.0
         pbar = tqdm(data_loader, total=len(data_loader), desc=f"Epoch {epoch + 1}/{num_epochs_gen}")
+        index = 0
         for images, labels in pbar:
             
             images = images.to(device)
@@ -193,7 +194,7 @@ if not generator_trained:
             gen_loss_sum += generator_loss.item()
             pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader), "Adversarial Loss":0.01*adversarial_loss.mean().item()})
         
-        if epoch == 1:
+        if epoch == 49 and index ==0:
             images = images.view(-1,3,32,32)
             generated_images = generated_images.view(-1,3,32,32)
             # print(generated_images[0].min(),images[0].min())
