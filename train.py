@@ -78,6 +78,7 @@ if not generator_trained:
         gen_loss_sum = 0.0
         disc_loss_sum = 0.0
         pbar = tqdm(data_loader, total=len(data_loader), desc=f"Epoch {epoch + 1}/{num_epochs}")
+        index = 0
         for images, labels in pbar:
             images = images.view(-1, 784).to(device)
             
@@ -96,8 +97,9 @@ if not generator_trained:
             gen_loss_sum += generator_loss.item()
             pbar.set_postfix({'Generator Loss': gen_loss_sum / len(data_loader)})
         
-        if epoch % 1 == 0:
-            # Plot and save real and generated images every epoch
-            plot_images(images[:10], generated_images[:10], epoch)
+            if epoch == 49 and index ==0:
+                # Plot and save real and generated images every epoch
+                plot_images(images[:5], generated_images[:5], epoch)
+            index +=1
     torch.save(generator.state_dict(), 'generator.pth')
     print("Training completed.")
